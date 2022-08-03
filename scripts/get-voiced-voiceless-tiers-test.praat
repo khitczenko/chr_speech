@@ -2,7 +2,7 @@
 clearinfo
 
 ## Set directories
-textgrid_directory$ = "/Users/kasia/Documents/Research/nu/rppbj-automatic-acoustic-analysis/data_chr/training-data-for-autovot-rp/"
+textgrid_directory$ = "/Users/kasia/Documents/Research/nu/rppbj-automatic-acoustic-analysis/data_chr/input-to-autovot-rp-wavtg/"
 
 ## Get a listing of all the sound files in the sound_directory
 list = Create Strings as file list:  "list", "'textgrid_directory$'/*.TextGrid"
@@ -21,33 +21,34 @@ for s to number
 	selectObject: tg_file
 	nTiers = Get number of tiers
 	if nTiers > 4
-		Remove tier: 6
-		Remove tier: 5
+		exitScript: "Too many tiers!"
 	endif
 
 	# Add voiceless and voiced tiers
-	Insert interval tier: 5, "voiceless-manual"
-	Insert interval tier: 6, "voiced-manual"
+	Insert interval tier: 4, "voiceless-windows"
+	Insert interval tier: 5, "voiced-windows"
 
-	# Loop through intervals in 4th tier and copy to 5th or 6th depending on whether voiced or voiceless
-	nIntervals = Get number of intervals: 4
+	# Loop through intervals in 3rd tier and copy to 4th or 5th depending on whether voiced or voiceless
+	nIntervals = Get number of intervals: 3
 	for i to nIntervals
-		label$ = Get label of interval: 4,i
-		if label$ <> ""
-			start = Get start time of interval: 4,i
-			end = Get end time of interval: 4,i
+		start = Get start time of interval: 3,i
+		end = Get end time of interval: 3,i
+		currIntN_tiertwo = Get interval at time: 2,(start+end)/2
+		label$ = Get label of interval: 2,currIntN_tiertwo
+		win_label$ = Get label of interval: 3,i
+		if win_label$ <> ""
 			if label$ == "P" || label$ == "T" || label$ == "K"
+				Insert boundary: 4,start
+				Insert boundary: 4,end
+				currIntN = Get interval at time: 4,(start+end)/2
+				Set interval text: 4,currIntN,"vot"
+			endif
+			if label$ == "B" || label$ == "D" || label$ == "G"
 				Insert boundary: 5,start
 				Insert boundary: 5,end
 				currIntN = Get interval at time: 5,(start+end)/2
 				Set interval text: 5,currIntN,"vot"
 			endif
-			if label$ == "B" || label$ == "D" || label$ == "G"
-				Insert boundary: 6,start
-				Insert boundary: 6,end
-				currIntN = Get interval at time: 6,(start+end)/2
-				Set interval text: 6,currIntN,"vot"
-			endif	
 		endif		
 	endfor
 

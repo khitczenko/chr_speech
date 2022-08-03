@@ -3,7 +3,7 @@ clearinfo
 
 ## Set directory
 textgrid_directory$ = "/Users/kasia/Documents/Research/nu/rppbj-automatic-acoustic-analysis/data_chr/mfa-output-rp-tg/"
-output_textgrid_directory$ = "/Users/kasia/Documents/Research/nu/rppbj-automatic-acoustic-analysis/data_chr/input-to-autovot/"
+output_textgrid_directory$ = "/Users/kasia/Documents/Research/nu/rppbj-automatic-acoustic-analysis/data_chr/input-to-autovot-rp-wavtg/"
 
 ## Get a list of all of the textgrid files in the directory
 list = Create Strings as file list: "list", "'textgrid_directory$'/*.TextGrid"
