@@ -1,0 +1,444 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+library("dplyr")
+library("stringr")
+
+# Read in output of DDKtor & FastTrack; combine them into one df
+df <- read.csv("../ddk-speech-measures/ddktor_raw.csv", header = TRUE)
+formants <- read.csv("../ddk-speech-measures/fasttrack_raw.csv", header = TRUE)
+df <- merge(df, formants, by.x = c('file', 'seg_start'), by.y = c('inputfile', 'start'), all.x = TRUE)
+df$outputfile = df$vowel = df$duration = df$end <- NULL 
+
+```
+
+```{r}
+# FUNCTIONS
+
+# Function that outputs syll_num and full_syll lists to be added to the main df
+get_syll_info <- function(df) {
+  # We start off expecting to see a VOT
+  expecting_vot = 1
+  current_syll = 1
+  syll_num <- rep(NA,nrow(df))
+  full_syll <- rep(NA,nrow(df))
+  for (i in 1:nrow(df)) {
+    # We are expecting a VOT and we see a VOT
+    if (expecting_vot == TRUE && grepl('Vot', df[i,'seg_type'], fixed = TRUE)) {
+      # If it's the last segment, then update everything
+      if (i == nrow(df)) {
+        syll_num[i] <- current_syll
+        full_syll[i] <- 0
+      } # Otherwise, we're now expecting the next thing to *not* be a VOT
+      expecting_vot <- FALSE
+    } else if (expecting_vot == TRUE && !grepl('Vot', df[i,'seg_type'], fixed = TRUE)) {
+      # We are expecting a VOT, but it's not a VOT
+      syll_num[i] <- current_syll
+      full_syll[i] <- 0
+      current_syll <- current_syll + 1
+    } else if (expecting_vot == FALSE && !grepl('Vot', df[i,'seg_type'], fixed = TRUE)) {
+      # We are expecting a vowel and we get a vowel
+      # The previous VOT ends at the same time as this Vowel starts -> count them as one syllable and update their info
+      if (df[i-1,"seg_end"] == df[i, "seg_start"]) {
+        syll_num[i-1] <- current_syll
+        syll_num[i] <- current_syll
+        current_syll <- current_syll + 1
+        full_syll[i-1] <- 1
+        full_syll[i] <- 1
+        expecting_vot <- TRUE
+      } else{
+        # The VOT and Vowels start/end at different times -> treat as 2 different syllables
+        syll_num[i-1] <- current_syll
+        full_syll[i-1] <- 0
+        current_syll <- current_syll + 1
+        syll_num[i] <- current_syll
+        full_syll[i] <- 0
+        current_syll <- current_syll + 1
+        expecting_vot <- TRUE
+      }
+    } else if (expecting_vot == FALSE && grepl('Vot', df[i,'seg_type'], fixed = TRUE)) {
+      # We are expecting a vowel, but we get a VOT
+      syll_num[i-1] <- current_syll
+      full_syll[i-1] <- 0
+      current_syll <- current_syll + 1
+      # If it's the last one, update everything
+      if (i == nrow(df)) {
+        syll_num[i] <- current_syll
+        full_syll[i] <- 0
+      }
+    } else {
+      "Something weird has happened!"
+    }
+  }
+  return(list("syll_num" = syll_num, "full_syll" = full_syll))
+}
+
+# Given a list of values, var, get the cutoff such that at most X% (percent) of values fall above that (depending
+# on whether topbottom = bottom or topbottom = top). 
+get_cutoff <- function(var, topbottom, percent) {
+  if (topbottom == 'bottom') {
+    temp <- sort(var, decreasing = FALSE)
+  }
+  else {
+    temp <- sort(var, decreasing = TRUE)
+  }
+  row_to_query <- floor(percent * length(var))
+  return(temp[row_to_query])
+}
+
+```
+
+```{r}
+
+# We'll start off by getting the syllable number that each segment belongs to (syll_num), as well as whether
+# each segment is part of a full syllable (C+V; full_syll)
+# Get a list of all of the files we're analyzing
+files <- levels(factor(df$file))
+for (i in 1:length(files)) {
+  subfile <- subset(df, file == files[i])
+  windows <- levels(factor(subfile$window_start))
+  # Calculate syll_num & full_syll for each syllable in this window and add to df
+  for (j in 1:length(windows)) {
+    current_subset <- subset(subfile, window_start == windows[j])
+    syll_info <- get_syll_info(current_subset)
+    df$syll_num[df$file == files[i] & df$window_start == windows[j]] <- syll_info$syll_num
+    df$full_syll[df$file == files[i] & df$window_start == windows[j]] <- syll_info$full_syll
+  }
+}
+
+# Next, we get the most extreme values WITHIN participants (treats repeating/alternating separately)
+fns <- levels(factor(df$file))
+for (i in 1:length(fns)) {
+  # Get lower and upper cutoffs for VOTS and Vowels separately
+  vot_subset <- subset(df, file == fns[i] & grepl('Vot',seg_type, fixed=TRUE))
+  vowel_subset <- subset(df, file == fns[i] & grepl('Vowel',seg_type, fixed=TRUE))
+  
+  # Get threshold so that NO GREATER than x% of durations are more extreme than it
+  vot_lower_cutoff <- get_cutoff(vot_subset$seg_duration, 'bottom', 0.02)
+  vot_upper_cutoff <- get_cutoff(vot_subset$seg_duration, 'top', 0.05)
+  vowel_lower_cutoff <- get_cutoff(vowel_subset$seg_duration, 'bottom', 0.02)
+  vowel_upper_cutoff <- get_cutoff(vowel_subset$seg_duration, 'top', 0.05)
+  
+  # Add this info into df
+  df$extreme_value_withinparts[df$file==fns[i] & grepl('Vot',df$seg_type, fixed=TRUE)] <- ifelse(df$seg_duration[df$file==fns[i] & grepl('Vot',df$seg_type, fixed=TRUE)] < vot_lower_cutoff | df$seg_duration[df$file==fns[i] & grepl('Vot',df$seg_type, fixed=TRUE)] > vot_upper_cutoff, 1, 0)
+  df$extreme_value_withinparts[df$file==fns[i] & grepl('Vowel',df$seg_type, fixed=TRUE)] <- ifelse(df$seg_duration[df$file==fns[i] & grepl('Vowel',df$seg_type, fixed=TRUE)] < vowel_lower_cutoff | df$seg_duration[df$file==fns[i] & grepl('Vowel',df$seg_type, fixed=TRUE)] > vowel_upper_cutoff, 1, 0)
+}
+
+df$subtask <- ifelse(nchar(df$window_type) < 6, 'amr', 'smr')
+df$voiced <- 0
+df$voiced[grepl('b',df$window_type, fixed=TRUE) | grepl('d',df$window_type, fixed=TRUE) | grepl('g',df$window_type, fixed=TRUE)] <- 1 
+
+```
+
+
+```{r}
+
+# Make syllables data frame from df by merging segment info that fall in the same syllable
+total_new_rows <- nrow(subset(df,full_syll==1))/2 + nrow(subset(df,full_syll==0))
+file=window_type <- rep("", total_new_rows)
+participant=syll_start=syll_end=syll_duration=window_start=window_end=syll_num=full_syll <- rep(NA, total_new_rows)
+syllables <- data.frame(file, syll_start, syll_end, syll_duration, window_type, window_start, window_end, syll_num, full_syll, stringsAsFactors=FALSE)
+
+df$file <- as.character(df$file)
+df$window_type <- as.character(df$window_type)
+
+i=j<-1
+while (i <= nrow(df)) {
+  # copy over everything that's the same
+  syllables[j,"file"] <- df[i,"file"]
+  syllables[j,"syll_start"] <- df[i,"seg_start"]
+  syllables[j,"window_type"] <- df[i,"window_type"]
+  syllables[j,"window_start"] <- df[i,"window_start"]
+  syllables[j,"window_end"] <- df[i,"window_end"]
+  syllables[j,"syll_num"] <- df[i,"syll_num"]
+  syllables[j,"full_syll"] <- df[i,"full_syll"]
+  # get syll_end and syll_duration information differently depending on whether we're dealing with a full (C+V) syllable or not
+  if (df[i,'full_syll'] == 1) {
+    syllables[j,"syll_end"] <- df[i+1,"seg_end"]
+    syllables[j,"syll_duration"] <- df[i+1,"seg_end"]-df[i,"seg_start"]
+    i <- i + 2
+    j <- j + 1
+  } else {
+    syllables[j,"syll_end"] <- df[i,"seg_end"]
+    syllables[j,"syll_duration"] <- df[i,"seg_end"]-df[i,"seg_start"]
+    i <- i + 1
+    j <- j + 1
+  }
+}
+
+# Add information about intersyllable duration
+for (i in 1:nrow(syllables)) {
+  syllables[i,'intersyll_duration'] <- ifelse(syllables[i,'syll_num'] == 1, NA, syllables[i,"syll_start"]-syllables[i-1,"syll_end"])
+}
+
+syllables$subtask <- ifelse(nchar(syllables$window_type) < 6, 'amr', 'smr')
+syllables$voiced <- 0
+syllables$voiced[grepl('b',syllables$window_type, fixed=TRUE) | grepl('d',syllables$window_type, fixed=TRUE) | grepl('g',syllables$window_type, fixed=TRUE)] <- 1
+
+```
+
+
+```{r}
+# Make DDK rate data frame, which gives information about the windows broadly
+
+windows <- distinct(data.frame(df$file, df$window_start, df$window_end))
+colnames(windows) <- c('file', 'win_start', 'win_end')
+
+for (i in 1:nrow(windows)) {
+    sub <- subset(df, file == windows[i,'file'] & seg_end > as.numeric(as.character(windows[i,'win_start'])) & seg_start < as.numeric(as.character(windows[i, 'win_end'])))
+    sub <- sub[order(sub[,'seg_start']),]
+    windows[i, 'win_type'] <- trimws(sub[1,'window_type'])
+    windows[i, 'nsyll'] <- max(sub$syll_num)
+    
+    # Correct nsyll to account for particularly long vowels
+    # NOTE: that we now do this elsewhere. This means that we subset which syllables to include based
+    # on DDKtor output. Then update later for DDK rate calculation.
+    # This is done by adding a syllable for every time there is a vowel that is > 2*mean_duration(all of this participant's vowels)
+    # part_vowels <- subset(df, df$file == windows[i,'file'] & grepl('Vowel',df$seg_type,fixed=TRUE))
+    # windows[i, 'nsyll'] <- windows[i, 'nsyll'] + nrow(subset(sub, grepl('Vowel',seg_type,fixed=TRUE) & seg_duration > 2*mean(part_vowels$seg_duration)))
+      
+    windows[i, 'speech_start'] <- sub[1, 'seg_start']
+    windows[i, 'speech_end'] <- sub[nrow(sub), 'seg_end']
+    # windows[i, 'speech_dur'] <- windows[i, 'speech_end'] - windows[i, 'speech_start']
+    # windows[i, 'ddk_rate'] <- windows[i, 'nsyll'] / windows[i, 'speech_dur']
+    
+    # windows[i, 'mean_vot_dur'] <- mean(subset(sub, grepl('Vot', seg_type, fixed = TRUE))$seg_duration)
+    # windows[i, 'mean_vowel_dur']<- mean(subset(sub, grepl('Vowel', seg_type, fixed = TRUE))$seg_duration)
+    windows[i, 'subtask'] <- ifelse(grepl('SpeechA2', windows[i,'file'], fixed = TRUE), 'smr', 'amr')
+    
+    # Get information about how much time the participant is actually speaking (producing VOT or vowel) vs pausing
+    ## THIS HAPPENS BEFORE EXCLUSIONS, I BELIEVE
+    # windows[i,'total_dur_vowelvot'] <- sum(sub$seg_duration)
+    # windows[i,'total_dur_pausing'] <- (windows[i,'speech_end'] - windows[i,'speech_start']) - sum(sub$seg_duration)
+    
+    # If you want to get information about formants by trial, add here!
+}
+
+# Create variable that determines whether we're within the correct ballpark of productions
+# percent_threshold <- 0.20
+# windows$ddktor_count_close[windows$subtask == 'smr'] <- ifelse(abs(windows$nsyll[windows$subtask == 'smr'] - 30) < percent_threshold * 30,1,0)
+# windows$ddktor_count_close[windows$subtask == 'amr'] <- ifelse(abs(windows$nsyll[windows$subtask == 'amr'] - 15) < percent_threshold * 15,1,0)
+    
+# Label voiced windows
+windows$voiced <- 0
+windows$voiced[grepl('b',windows$win_type, fixed=TRUE) | grepl('d',windows$win_type, fixed=TRUE) | grepl('g',windows$win_type, fixed=TRUE)] <- 1
+
+```
+
+```{r}
+
+## THIS IS OLD CODE AS OF JUNE 1, 2022. IT'S SLOW AND WAY EASIER TO DO OTHERWISE.
+## ALSO NO LONGER CALCULATING DDKTOR_COUNT_CLOSE VARIABLE
+
+# # Now go back and add the ddktor_count_close & voiced variables to the df & syllable data frames from the windows data frame
+# for (i in 1:nrow(df)) {
+#   relevant_window <- subset(windows, file == df[i,'file'] & speech_start < df[i,'seg_end'] & speech_end > df[i,'seg_start'])
+#   df[i,'ddktor_count_close'] <- relevant_window$ddktor_count_close
+#   df[i,'voiced'] <- relevant_window$voiced
+#   df[i,'subtask'] <- relevant_window$subtask
+# }
+# 
+# for (i in 1:nrow(syllables)) {
+#   relevant_window <- subset(windows, file == syllables[i,'file'] & win_start == syllables[i,'window_start'])
+#   syllables[i,'ddktor_count_close'] <- relevant_window$ddktor_count_close
+#   syllables[i,'voiced'] <- relevant_window$voiced
+#   syllables[i,'subtask'] <- relevant_window$subtask
+# }
+
+```
+
+```{r}
+
+### THIS IS OLD CODE -- OLD WAY OF DECIDING WHICH WINDOWS TO INCLUDE
+
+# # This code decides which windows to include:
+# # Currently set to the first N trials where N is the number of trials the participants were asked
+# # to produce, ignoring trials where they produced less than 2/3 of what they were asked to produce.
+# 
+# windows$include <- 1
+# windows$include[windows$subtask == 'amr' & windows$nsyll < 10] <- 0
+# windows$include[windows$subtask == 'smr' & windows$nsyll < 15] <- 0
+# 
+# # Determine which windows to include
+# files <- unique(windows$file)
+# for (i in 1:length(files)) {
+#   n_pa <- nrow(subset(windows, file == files[i] & win_type %in% c('pa', 'pa?') & include == 1))
+#   if (n_pa > 2) {
+#     start_time  <- subset(windows, file == files[i] & win_type %in% c('pa', 'pa?') & include == 1)$speech_start[3]
+#     windows$include[windows$file == files[i] & windows$win_type %in% c('pa', 'pa?') & windows$speech_start >= start_time] <- 0
+#   }
+# 
+#   n_ta <- nrow(subset(windows, file == files[i] & win_type %in% c('ta', 'ta?') & include == 1))
+#   if (n_ta > 2) {
+#     start_time  <- subset(windows, file == files[i] & win_type %in% c('ta', 'ta?') & include == 1)$speech_start[3]
+#     windows$include[windows$file == files[i] & windows$win_type %in% c('ta', 'ta?') & windows$speech_start >= start_time] <- 0
+#   }  
+# 
+#   n_ka <- nrow(subset(windows, file == files[i] & win_type %in% c('ka', 'ka?') & include == 1))
+#   if (n_ka > 2) {
+#     start_time  <- subset(windows, file == files[i] & win_type %in% c('ka', 'ka?') & include == 1)$speech_start[3]
+#     windows$include[windows$file == files[i] & windows$win_type %in% c('ka', 'ka?') & windows$speech_start >= start_time] <- 0
+#   }    
+# 
+#   n_pataka <- nrow(subset(windows, file == files[i] & win_type %in% c('pataka', 'pataka?') & include == 1))
+#   if (n_pataka > 10) {
+#     start_time  <- subset(windows, file == files[i] & win_type %in% c('pataka', 'pataka?') & include == 1)$speech_start[11]
+#     windows$include[windows$file == files[i] & windows$win_type %in% c('pataka', 'pataka?') & windows$speech_start >= start_time] <- 0
+#   }   
+# 
+#   n_katapa <- nrow(subset(windows, file == files[i] & win_type %in% c('katapa', 'katapa?') & include == 1))
+#   if (n_pataka > 10) {
+#     start_time  <- subset(windows, file == files[i] & win_type %in% c('katapa', 'katapa?') & include == 1)$speech_start[11]
+#     windows$include[windows$file == files[i] & windows$win_type %in% c('katapa', 'katapa?') & windows$speech_start >= start_time] <- 0
+#   }   
+# }
+# 
+# # Now go back and deal with df and syllables
+# for (i in 1:nrow(df)) {
+#   relevant_window <- subset(windows, file == df[i,'file'] & speech_start < df[i,'seg_end'] & speech_end > df[i,'seg_start'])
+#   df[i,'include'] <- relevant_window$include
+# }
+# 
+# for (i in 1:nrow(syllables)) {
+#   relevant_window <- subset(windows, file == syllables[i,'file'] & win_start == syllables[i,'window_start'])
+#   syllables[i,'include'] <- relevant_window$include
+# }
+# 
+# 
+```
+
+```{r}
+# This code decides which windows to include:
+# Currently set to the first N trials where N is the number of trials the participants were asked
+# to produce, ignoring trials where they produced less than 2/3 of what they were asked to produce.
+
+# TODO: why is there pataka\034
+windows$win_type[windows$win_type == "pataka\034"] <- 'pataka'
+
+# Get rid of voiced windows
+windows <- subset(windows, voiced == FALSE)
+windows$voiced <- NULL
+
+# The idea here is to sort and then subset the first ones
+
+windows$sorting <- 1:nrow(windows)
+windows <- windows[order(-windows$nsyll),]
+windows$include <- 0
+
+files <- unique(windows$file)
+for (i in 1:length(files)) {
+  tmp <- subset(windows, file == files[i])
+  # Deal with AMR case -- pa first
+  if (grepl('SpeechA1', files[i], fixed = TRUE)) {
+    n_pa <- nrow(subset(tmp, win_type %in% c('pa', 'pa?')))
+    if (n_pa > 0) {
+      windows$include[windows$file == files[i] & windows$win_type %in% c('pa', 'pa?')][1:min(2,n_pa)] <- 1
+    }
+    
+    n_ta <- nrow(subset(tmp, win_type %in% c('ta', 'ta?')))
+    if (n_ta > 0) {
+      windows$include[windows$file == files[i] & windows$win_type %in% c('ta', 'ta?')][1:min(2,n_ta)] <- 1
+    }   
+    
+    n_ka <- nrow(subset(tmp, win_type %in% c('ka', 'ka?')))
+    if (n_ka > 0) {
+      windows$include[windows$file == files[i] & windows$win_type %in% c('ka', 'ka?')][1:min(2,n_ka)] <- 1
+    }  
+  } else {
+    n_pataka <- nrow(subset(tmp, str_trim(win_type) %in% c('pataka', 'pataka?', 'pataka\034')))
+    if (n_pataka > 0) {
+      windows$include[windows$file == files[i] & windows$win_type %in% c('pataka', 'pataka?')][1:min(10,n_pataka)] <- 1
+    }
+    
+    n_katapa <- nrow(subset(tmp, win_type %in% c('katapa', 'katapa?')))
+    if (n_katapa > 0) {
+      windows$include[windows$file == files[i] & windows$win_type %in% c('katapa', 'katapa?')][1:min(10,n_katapa)] <- 1
+    }
+  }
+}
+
+# Now resort the data frame
+windows <- windows[order(windows$sorting),]
+windows$sorting <- NULL
+windows$include[windows$subtask == 'amr' & windows$nsyll < 10] <- 0
+windows$include[windows$subtask == 'smr' & windows$nsyll < 15] <- 0
+
+df <- subset(df, voiced == 0)
+# Now go back and deal with df and syllables
+for (i in 1:nrow(df)) {
+  relevant_window <- subset(windows, file == df[i,'file'] & speech_start < df[i,'seg_end'] & speech_end > df[i,'seg_start'])
+  df[i,'include'] <- relevant_window$include
+}
+
+syllables <- subset(syllables, voiced == 0)
+for (i in 1:nrow(syllables)) {
+  relevant_window <- subset(windows, file == syllables[i,'file'] & win_start == syllables[i,'window_start'])
+  syllables[i,'include'] <- relevant_window$include
+}
+
+
+```
+
+```{r}
+
+# Cut segments so that each window has at most the number of syllables requested
+df <- subset(df, subtask == 'amr' & syll_num <= 15 | subtask == 'smr' & syll_num <= 30)
+syllables <- subset(syllables, subtask == 'amr' & syll_num <= 15 | subtask == 'smr' & syll_num <= 30)
+
+```
+
+```{r}
+### NEED TO UPDATE OUR DDKRATES DATA FRAME TO LIMIT TO THE SAME SYLLABLES AS ELSEWHERE
+# Yes, this looks like what's above, but both get run
+old_windows <- windows
+for (i in 1:nrow(windows)) {
+    sub <- subset(df, file == windows[i,'file'] & seg_end > as.numeric(as.character(windows[i,'win_start'])) & seg_start < as.numeric(as.character(windows[i, 'win_end'])))
+    sub <- sub[order(sub[,'seg_start']),]
+    windows[i, 'win_type'] <- trimws(sub[1,'window_type'])
+    windows[i, 'nsyll'] <- max(sub$syll_num)
+    
+    # Correct nsyll to account for particularly long vowels
+    # This is done by adding a syllable for every time there is a vowel that is > 2*mean_duration(all of this participant's vowels)
+    part_vowels <- subset(df, df$file == windows[i,'file'] & grepl('Vowel',df$seg_type,fixed=TRUE))
+    windows[i, 'nsyll'] <- windows[i, 'nsyll'] + nrow(subset(sub, grepl('Vowel',seg_type,fixed=TRUE) & seg_duration > 2*mean(part_vowels$seg_duration)))
+      
+    windows[i, 'speech_start'] <- sub[1, 'seg_start']
+    windows[i, 'speech_end'] <- sub[nrow(sub), 'seg_end']
+    windows[i, 'speech_dur'] <- windows[i, 'speech_end'] - windows[i, 'speech_start']
+    windows[i, 'ddk_rate'] <- windows[i, 'nsyll'] / windows[i, 'speech_dur']
+    
+    windows[i, 'mean_vot_dur'] <- mean(subset(sub, grepl('Vot', seg_type, fixed = TRUE))$seg_duration)
+    windows[i, 'mean_vowel_dur']<- mean(subset(sub, grepl('Vowel', seg_type, fixed = TRUE))$seg_duration)
+    windows[i,'total_dur_vowelvot'] <- sum(sub$seg_duration)
+    windows[i,'total_dur_pausing'] <- (windows[i,'speech_end'] - windows[i,'speech_start']) - sum(sub$seg_duration)
+    windows[i, 'pausing_ratio'] <- windows[i,'total_dur_pausing']/(windows[i,'total_dur_pausing'] + windows[i,'total_dur_vowelvot'])
+    # windows[i, 'subtask'] <- ifelse(grepl('SpeechA2', windows[i,'file'], fixed = TRUE), 'smr', 'amr')
+    
+    # If you want to get information about formants by trial, add here!
+}
+
+windows <- subset(windows, include == 1)
+
+```
+
+```{r}
+
+# Get rid of excessive white space
+df$seg_type <- trimws(df$seg_type)
+df$window_type <- trimws(df$window_type)
+syllables$window_type <- trimws(syllables$window_type)
+
+```
+
+```{r}
+
+write.csv(df, "../ddk-speech-measures/segments.csv", quote = FALSE, row.names = FALSE)
+write.csv(syllables, "../ddk-speech-measures/syllables.csv", quote = FALSE, row.names = FALSE)
+write.csv(windows, "../ddk-speech-measures/ddkrates.csv", quote = FALSE, row.names = FALSE)
+
+
+```

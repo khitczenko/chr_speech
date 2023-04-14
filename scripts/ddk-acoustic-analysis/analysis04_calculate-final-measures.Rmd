@@ -1,0 +1,254 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+# Read in output of DDKtor
+df <- read.csv("../ddk-speech-measures/segments.csv", header = TRUE)
+syllables <- read.csv("../ddk-speech-measures/syllables.csv", header = TRUE)
+windows <- read.csv("../ddk-speech-measures/ddkrates.csv", header = TRUE)
+
+```
+
+```{r}
+df$norm_seg_duration <- NA
+for (i in 1:(nrow(df)-1)) {
+  if (df[i,'full_syll'] == 1) {
+    df[i,'norm_seg_duration'] <- df[i,'seg_duration'] / df[i+1,'seg_duration']
+  }
+}
+```
+
+```{r}
+
+# Set up summary data frame
+file <- levels(factor(df$file))
+
+# Add in participant IDs and subtask
+subtask <- unlist(lapply(unlist(lapply(file, grepl, pattern = 'SpeechA2', fixed = TRUE)), ifelse, 'smr', 'amr'))
+data_summary <- data.frame(file, subtask)
+
+```
+
+```{r}
+
+library("bayestestR")
+
+# Function used to calculate overlap measures: calculate overlap between two distributions:
+# https://search.r-project.org/CRAN/refmans/bayestestR/html/overlap.html
+calculate_overlap <- function(df, cons1, cons2) {
+  dist1 <- subset(df, grepl(cons1, window_type, fixed = TRUE))$seg_duration
+  dist2 <- subset(df, grepl(cons2, window_type, fixed = TRUE))$seg_duration
+  overlap_coefficient <- overlap(dist1,dist2)
+  return(overlap_coefficient)
+}
+
+# Function used to do so: calculate overlap between two distributions:
+# https://search.r-project.org/CRAN/refmans/bayestestR/html/overlap.html
+calculate_overlap_fit_gaussian <- function(df, cons1, cons2) {
+  dist1 <- subset(df, grepl(cons1, window_type, fixed = TRUE))$seg_duration
+  dist1_mean <- mean(dist1)
+  dist1_sd <- sd(dist1)
+  dist2 <- subset(df, grepl(cons2, window_type, fixed = TRUE))$seg_duration
+  dist2_mean <- mean(dist2)
+  dist2_sd <- sd(dist2)
+  
+  dist1 <- distribution_normal(10000, mean = dist1_mean, sd = dist1_sd)
+  dist2 <- distribution_normal(10000, mean = dist2_mean, sd = dist2_sd)
+
+  overlap_coefficient <- overlap(dist1,dist2)
+  return(overlap_coefficient)
+}
+
+```
+
+
+```{r}
+
+# Calculate segment measures
+for (i in 1:nrow(data_summary)) {
+   part_subset <- subset(df, file == data_summary[i,'file'])
+   part_subset <- subset(part_subset, extreme_value_withinparts == 0)
+   part_subset <- subset(part_subset, include == 1)
+   # part_subset <- subset(part_subset, (subtask == 'amr' & syll_num <= 15) | (subtask == 'smr' & syll_num <= 30))
+   # part_subset <- subset(part_subset, ddktor_count_close == 1)
+   part_subset <- subset(part_subset, voiced == 0)
+   data_summary[i,'avg_vot_duration'] <- mean(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE))$seg_duration, na.rm = TRUE)
+   data_summary[i,'var_vot_duration'] <- var(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE))$seg_duration, na.rm = TRUE)
+   data_summary[i,'coeffvar_vot_duration'] <- sqrt(data_summary[i,'var_vot_duration']) / data_summary[i,'avg_vot_duration']
+   
+   # TODO: get rid of after March 23, 2023
+   data_summary[i,'avg_normvot_duration'] <- mean(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE))$norm_seg_duration, na.rm = TRUE)
+   data_summary[i,'var_normvot_duration'] <- var(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE))$norm_seg_duration, na.rm = TRUE)
+   data_summary[i,'coeffvar_normvot_duration'] <- sqrt(data_summary[i,'var_vot_duration']) / data_summary[i,'avg_vot_duration']
+   
+   data_summary[i,'avg_vowel_duration']<- mean(subset(part_subset, grepl('Vowel', seg_type, fixed = TRUE))$seg_duration, na.rm = TRUE)
+   data_summary[i,'var_vowel_duration']<- var(subset(part_subset, grepl('Vowel', seg_type, fixed = TRUE))$seg_duration, na.rm = TRUE)
+   data_summary[i,'coeffvar_vowel_duration'] <- sqrt(data_summary[i,'var_vowel_duration']) / data_summary[i,'avg_vowel_duration']
+   
+   data_summary[i,'avg_f1.20']<- mean(part_subset$f1.20, na.rm = TRUE)
+   data_summary[i,'var_f1.20']<- var(part_subset$f1.20, na.rm = TRUE)
+   data_summary[i,'avg_f2.20']<- mean(part_subset$f2.20, na.rm = TRUE)
+   data_summary[i,'var_f2.20']<- var(part_subset$f2.20, na.rm = TRUE)
+   data_summary[i,'avg_f1.50']<- mean(part_subset$f1.50, na.rm = TRUE)
+   data_summary[i,'var_f1.50']<- var(part_subset$f1.50, na.rm = TRUE)
+   data_summary[i,'avg_f2.50']<- mean(part_subset$f2.50, na.rm = TRUE)
+   data_summary[i,'var_f2.50']<- var(part_subset$f2.50, na.rm = TRUE)
+   data_summary[i,'avg_f1.80']<- mean(part_subset$f1.80, na.rm = TRUE)
+   data_summary[i,'var_f1.80']<- var(part_subset$f1.80, na.rm = TRUE)
+   data_summary[i,'avg_f2.80']<- mean(part_subset$f2.80, na.rm = TRUE)
+   data_summary[i,'var_f2.80']<- var(part_subset$f2.80, na.rm = TRUE)
+   
+   if (nrow(part_subset) == 0) {
+      data_summary[i,'avg_vot_duration'] <- NA
+      data_summary[i,'var_vot_duration'] <- NA
+      data_summary[i,'avg_vowel_duration']<- NA
+      data_summary[i,'var_vowel_duration']<- NA
+      
+      # TODO: get rid of after March 23, 20
+      data_summary[i,'avg_normvot_duration'] <- NA
+      data_summary[i,'var_normvot_duration'] <- NA
+      
+      data_summary[i,'avg_f1.20']<- NA
+      data_summary[i,'var_f1.20']<- NA
+      data_summary[i,'avg_f2.20']<- NA
+      data_summary[i,'var_f2.20']<- NA
+      data_summary[i,'avg_f1.50']<- NA
+      data_summary[i,'var_f1.50']<- NA
+      data_summary[i,'avg_f2.50']<- NA
+      data_summary[i,'var_f2.50']<- NA
+      data_summary[i,'avg_f1.80']<- NA
+      data_summary[i,'var_f1.80']<- NA
+      data_summary[i,'avg_f2.80']<- NA
+      data_summary[i,'var_f2.80']<- NA
+   }
+   
+   data_summary[sapply(data_summary, is.nan)] <- NA
+   
+    if (nrow(part_subset) > 0 & part_subset[1,'subtask'] == 'amr') {
+      # print("Working on pt overlap")
+      data_summary[i,'overlap_pt'] <- calculate_overlap(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 'p', 't')
+      data_summary[i,'overlap_pt_gauss'] <- calculate_overlap_fit_gaussian(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 'p', 't')
+      # print("Working on pk overlap")
+      data_summary[i,'overlap_pk'] <- calculate_overlap(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 'p', 'k')
+      data_summary[i,'overlap_pk_gauss'] <- calculate_overlap_fit_gaussian(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 'p', 'k')
+      # print("Working on tk overlap")
+      data_summary[i,'overlap_tk'] <- calculate_overlap(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 't', 'k')
+      data_summary[i,'overlap_tk_gauss'] <- calculate_overlap_fit_gaussian(subset(part_subset, grepl('Vot', seg_type, fixed = TRUE)), 't', 'k')
+  }
+}
+
+```
+
+
+```{r}
+# Calculate syllable-level metrics
+
+for (i in 1:nrow(data_summary)) {
+   part_subset <- subset(syllables, file == data_summary[i,'file'])
+   # part_subset <- subset(part_subset, middle_syll == 1)
+   # part_subset <- subset(part_subset, full_syll == 1)
+   # part_subset <- subset(part_subset, ddktor_count_close == 1)
+   part_subset <- subset(part_subset, include == 1)
+   part_subset <- subset(part_subset, (subtask == 'amr' & syll_num <= 15) | (subtask == 'smr' & syll_num <= 30))
+   part_subset <- subset(part_subset, voiced == 0)
+   data_summary[i,'avg_syll_duration'] <- mean(part_subset$syll_duration)
+   data_summary[i,'var_syll_duration'] <- var(part_subset$syll_duration)
+   data_summary[i,'coeffvar_syll_duration'] <- sd(part_subset$syll_duration) / mean(part_subset$syll_duration)
+   data_summary[i,'avg_intersyll_duration'] <- mean(part_subset$intersyll_duration, na.rm = TRUE)
+   data_summary[i,'var_intersyll_duration'] <- var(part_subset$intersyll_duration, na.rm = TRUE)
+   data_summary[i,'coeffvar_intersyll_duration'] <- sd(part_subset$intersyll_duration, na.rm = TRUE) / data_summary[i,'avg_intersyll_duration']
+   if (nrow(part_subset) == 0) {
+      data_summary[i,'avg_syll_duration'] <- NA
+      data_summary[i,'var_syll_duration'] <- NA
+      data_summary[i,'coeffvar_syll_duration'] <- NA
+      data_summary[i,'avg_intersyll_duration'] <- NA
+      data_summary[i,'var_intersyll_duration'] <- NA
+      data_summary[i,'coeffvar_intersyll_duration'] <- NA
+   }
+}
+
+```
+
+```{r}
+
+# Calculate DDK rate-level metrics
+
+for (i in 1:nrow(data_summary)) {
+   part_subset <- subset(windows, file == data_summary[i,'file'])
+   # part_subset <- subset(part_subset, middle_syll == 1)
+   # part_subset <- subset(part_subset, full_syll == 1)
+   # part_subset <- subset(part_subset, ddktor_count_close == 1)
+   part_subset <- subset(part_subset, include == 1)
+   # part_subset <- subset(part_subset, voiced == 0)
+   data_summary[i,'avg_ddk_rate'] <- mean(part_subset$ddk_rate)
+   data_summary[i,'var_ddk_rate'] <- var(part_subset$ddk_rate)
+   data_summary[i,'coeffvar_ddk_rate'] <- sd(part_subset$ddk_rate) / data_summary[i,'avg_ddk_rate']
+   data_summary[i,'overall_ddk_rate'] <- sum(part_subset$nsyll, na.rm = TRUE) / sum(part_subset$speech_dur, na.rm = TRUE)
+   data_summary[i,'avg_pausing_ratio'] <- mean(part_subset$pausing_ratio)
+   data_summary[i,'total_dur_votvowel'] <- sum(part_subset$total_dur_vowelvot)
+   data_summary[i,'total_pausing'] <- sum(part_subset$total_dur_pausing)
+   if (nrow(part_subset) == 0) {
+      data_summary[i,'avg_ddk_rate'] <- NA
+      data_summary[i,'var_ddk_rate'] <- NA
+      data_summary[i,'overall_ddk_rate'] <- NA
+      data_summary[i,'avg_pausing_ratio'] <- NA
+   }
+}
+
+```
+
+```{r}
+# Calculate formant measures
+
+# Calculate medians at 20% and 50%
+for (i in 1:nrow(data_summary)) {
+  sub <- subset(df, file == data_summary[i, 'file'] & grepl('Vowel', seg_type, fixed = TRUE))
+  data_summary[i, 'median.f1.20'] <- median(sub$f1.20, na.rm = TRUE)
+  data_summary[i, 'median.f2.20'] <- median(sub$f2.20, na.rm = TRUE)
+  data_summary[i, 'median.f1.50'] <- median(sub$f1.50, na.rm = TRUE)
+  data_summary[i, 'median.f2.50'] <- median(sub$f2.50, na.rm = TRUE)
+}
+
+for (i in 1:nrow(data_summary)) {
+  sub <- subset(df, file == data_summary[i, 'file'] & grepl('Vowel', seg_type, fixed = TRUE))
+  sub$f1.20distsq <- (sub$f1.20 - data_summary[i,'median.f1.20'])**2
+  sub$f2.20distsq <- (sub$f2.20 - data_summary[i,'median.f2.20'])**2
+  sub$f1.50distsq <- (sub$f1.50 - data_summary[i,'median.f1.50'])**2
+  sub$f2.50distsq <- (sub$f2.50 - data_summary[i,'median.f2.50'])**2
+  
+  data_summary[i,'formant_dispersion.50'] <- mean(sqrt(sub$f1.50distsq + sub$f2.50distsq), na.rm = TRUE)
+  data_summary[i,'formant_dispersion.20'] <- mean(sqrt(sub$f1.20distsq + sub$f2.20distsq), na.rm = TRUE)
+  data_summary[i,'formant_delta_var'] <- data_summary[i,'formant_dispersion.20'] - data_summary[i,'formant_dispersion.50']
+  
+}
+
+data_summary[sapply(data_summary, is.nan)] <- NA
+
+
+```
+
+
+```{r}
+
+# Get extra information (participant, window number) that we want to output to file
+# windows$part_id <- substr(windows$file,1,7)
+fns <- levels(factor(windows$file))
+for (i in 1:length(fns)) {
+   windows$win_number[windows$file == fns[i]] <- seq(1,nrow(subset(windows, file == fns[i])))
+}
+
+trial_summary <- data.frame(windows$file, windows$subtask, windows$win_number, windows$win_type, windows$win_start, windows$nsyll, windows$ddk_rate, windows$mean_vot_dur, windows$mean_vowel_dur)
+names(trial_summary) <- c('file', 'subtask', 'window_number', 'window_type', 'window_start', 'nsyll', 'ddk_rate', 'mean_vot_duration', 'mean_vowel_duration')
+
+```
+
+```{r}
+
+write.csv(data_summary, "../ddk-speech-measures/final-part-measures.csv", quote = FALSE, row.names = FALSE)
+write.csv(trial_summary, "../ddk-speech-measures/final-trial-measures.csv", quote = FALSE, row.names = FALSE)
+
+```
+
