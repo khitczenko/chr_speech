@@ -730,7 +730,7 @@ ddkrate_sex_rp <- ggplot(rp, aes(x=Demo_Sex, y=log_coeffvar_local_speech_rate, f
 
 ```
 
-```{r, sex-plot, fig.width = 11, fig.height = 7, fig.cap = "\\label{fig:sex-plot} We found no relationship between participant sex and speech measures in our sample. The top row shows results for the variability in voiceless consonant production measure, while the bottom row shows results for the variability in speech rate measure. The leftmost column corresponds to the Diadochokinetic-AMR (papapa/tatata/kakaka) speech task; the middle column corresponds to the Diadochokinetic-SMR (pataka/katapa) speech task; the rightmost column corresponds to the Read speech task. TODO"}
+```{r, sex-plot, fig.width = 11, fig.height = 7, fig.cap = "\\label{fig:sex-plot} We found no relationship between participant sex and speech measures in our sample. The top row shows results for the variability in voiceless consonant production measure, while the bottom row shows results for the variability in speech rate measure. The leftmost column corresponds to the Diadochokinetic-AMR (papapa/tatata/kakaka) speech task; the middle column corresponds to the Diadochokinetic-SMR (pataka/katapa) speech task; the rightmost column corresponds to the Read speech task. Each black dot represents one participant; the white dot represents the average value across participants."}
 
 sex_corr <- ggarrange(ncol = 3, nrow = 2, vot_sex_amr, vot_sex_smr, vot_sex_rp, ddkrate_sex_amr, ddkrate_sex_smr, ddkrate_sex_rp)
 sex_corr
