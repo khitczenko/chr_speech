@@ -32,15 +32,22 @@ require("papaja")
 library(ggplot2)
 library(dplyr)
 library(ggpubr)
+library(pROC)
+library(kableExtra)
+library("stringr")
+library("flextable")
+library("officer")
+library("sjmisc")
+library("tibble")
 
 mypval<-function(p) if(p < .001) "< .001" else paste("=", round(p,3))
 myround <-function(val) round(val,2)
 
 grpdiff_output <- function(test,var) {
-  out <- paste0("$\\beta$ = ", myround(summary(test)$coefficients[var, "Estimate"]),
-                ", s.e. = ", myround(summary(test)$coefficients[var, "Std. Error"]),
-                ", z = ", myround(summary(test)$coefficients[var, "z value"]),
-                ", p ", mypval(summary(test)$coefficients[var, "Pr(>|z|)"]))
+  out <- paste0("$\\beta$ = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "Estimate"]),
+                ", s.e. = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "Std. Error"]),
+                ", t = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "t value"]),
+                ", p ", mypval(summary(test)$coefficients["part_grpClinical High-Risk", "Pr(>|t|)"]))
   return(out)
 }
 
@@ -50,6 +57,11 @@ corr_output <- function(test,var) {
                 ", t = ", myround(summary(test)$coefficients[var, "t value"]),
                 ", p ", mypval(summary(test)$coefficients[var, "Pr(>|t|)"]))
   return(out)
+}
+
+get_rvalue <- function(df, x, y) {
+  df <- subset(df, part_grp == 'Clinical High-Risk')
+  return(myround(cor(df[x], df[y])))
 }
 
 ```
@@ -66,7 +78,7 @@ When the sunlight strikes raindrops in the air, they act as a prism and form a r
 
 From each participant’s two diadochokinetic speech samples, we automatically extracted: (1) the voice-onset-time for every syllable-initial voiceless stop consonant, (2) the duration of every vowel, (3) the first and second formants for every vowel (at 20% and midpoint of the vowel), as well as (4) the speech rate for each individual Diadochokinetic trial.
 
-To do so, we used DDKtor (Segal et al., 2022; https://github.com/MLSpeech/DDKtor) to automatically obtain the VOTs and vowel durations, given hand-selected windows of analysis which corresponded to the individual Diadochokinetic trials. We then used FastTrack (Barreda, 2021; https://github.com/santiagobarreda/FastTrack) to obtain formants for every vowel that was identified by DDKtor. Finally, we obtained speech rate measures for each DDK trial directly from the DDKtor output. This was calculated as the number of syllables the participant produced in the trial divided by the amount of time it took them to produce it (i.e., the time elapsed from the start of the first syllable to the end of the last syllable, as found by DDKtor). We followed all recommendations and default settings given by the creators of the tools. In particular, following DDKtor recommendations, we excluded the shortest 2% and longest 5% of VOTs and vowel durations from our analyses and we double counted extremely long syllables (i.e., syllables with vowels that were at least twice as long as that speaker's average vowel duration) in speech rate calculations. FastTrack requires specifying an analysis range, by setting a low and high frequency. Following FastTrack default recommendations, we set this range to 4500-6500 Hz for male speakers and 5000-7000 Hz for female speakers.
+To do so, we used DDKtor (Segal et al., 2022; https://github.com/MLSpeech/DDKtor) to automatically obtain the VOTs and vowel durations, given hand-selected windows of analysis which corresponded to the individual Diadochokinetic trials. We then used FastTrack (Barreda, 2021; https://github.com/santiagobarreda/FastTrack) to obtain formants for every vowel that was identified by DDKtor. Finally, we obtained speech rate measures for each DDK trial directly from the DDKtor output. This was calculated as the number of syllables the participant produced in the trial divided by the amount of time it took them to produce it (i.e., the time elapsed from the start of the first syllable to the end of the last syllable, as found by DDKtor). We followed all recommendations and default settings given by the creators of the tools. In particular, following DDKtor recommendations, we excluded the shortest 2% and longest 5% of VOTs and vowel durations from our analyses and we double counted extremely long syllables (i.e., syllables with vowels that were at least twice as long as that speaker's average vowel duration) in speech rate calculations. FastTrack requires specifying a plausible range for the maximum analysis frequency value, which it uses to identify the best value below which it should search for F1-F5. Following FastTrack default recommendations, we set this range to 4500-6500 Hz for male speakers and 5000-7000 Hz for female speakers.
 
 Although participants were asked to produce a specific number of syllables and trials, they sometimes deviated from this number. To ensure our measures were based on a sufficient, and relatively equal number of syllables/trials across participants, we excluded AMR (papapa/tatata/kakaka) trials in which participants produced fewer than 10 syllables (when they were supposed to produce 15) and SMR (pataka/katapa) trials in which participants produced fewer than 15 syllables (when they were supposed to produce 30). In addition, we excluded any extra trials participants produced (i.e., we capped the number of analyzed trials at 2 for each type of AMR trial - papapa, tatata, kakaka - and 10 for each type of SMR trial - pataka, katapa).
 
@@ -92,7 +104,7 @@ In addition to the vowel duration measure discussed in the main text, we also an
 
 - **Formant dispersion at 20% of the vowel (all speech samples)**: The first measure of vowel formant variability was calculated in two-dimensional (Formant1, Formant2) space as follows:
 $$\text{Formant Dispersion} = \frac{\sum_{i=1}^{n}{\sqrt{(F1_i-F1_m)^2 + (F2_i-F2_m)^2}}}{n}$$
-That is, we calculate the distance between each vowel token, $i$ ($i=1...n$) with formants $F1_i$,$F2_i$), and the center of the vowel space (calculated as the median $F1$,$F2$: $F1_m$,$F2_m$). We then average these $n$ values to arrive at an average formant dispersion (Niziolek & Kiran, 2018). We chose to measure this early in the vowel (at 20% of its duration), as past work has shown that motor control issues are more likely to affect early production (i.e., before there is time to reach the target pronunciation). If anything, we would expect this choice to over-exaggerate differences in production related to motor control issues.
+That is, we calculate the distance between each vowel token, $i$ ($i=1...n$) with formants $F1_i$,$F2_i$), and the center of the vowel space (calculated as the thodsdian $F1$,$F2$: $F1_m$,$F2_m$). We then average these $n$ values to arrive at an average formant dispersion (Niziolek & Kiran, 2018). We chose to measure this early in the vowel (at 20% of its duration), as past work has shown that motor control issues are more likely to affect early production (i.e., before there is time to reach the target pronunciation). If anything, we would expect this choice to over-exaggerate differences in production related to motor control issues.
 
 - **Change in formant dispersion between 20% and 50% of the vowel (all speech samples)**: The second measure of vowel formant variability was calculated as the difference between the average formant dispersions at 20% and 50% of the vowels:
 $$\Delta\text{Formant Dispersion} = \text{Formant Dispersion at 20\%} - \text{Formant Dispersion at 50\%}$$
@@ -110,7 +122,92 @@ where $i$ and $j$ represent two vowel tokens being compared, $/i/$ and $/j/$ rep
 
 - **Total number of pauses (normalized by number of words produced; read and spontaneous speech samples only)**: We calculated the number of pauses, defined as any silence longer than 150ms. We divided this number by the total number of words the participant produced, to account for differences in total speech sample duration (this could differ even in the Read speech, as participants sometimes stumbled over words, repeated fragments, overlooked words, etc.). Note we excluded this measure for the Diadochokinetic Speech task, as the number of pauses was pre-specified by the nature of the task. Pausing has previously been studied in the high-risk group by Sichlinger et al. (2019) and Stanislawski et al. (2021).
 
-Note: We also studied a number of other speech measures that we do not discuss or report detailed results for here. In particular, in addition to coefficients of variation, we also studied simple variances, and found qualitatively similar, but slightly statistically different, results. We also studied pairwise overlap measures between individual stop categories (e.g., /p/-/t/), finding null results, mirroring the vowel overlap measures presented here. With regards to validation measures (i.e., non-speech motor measures), we also studied the SMAP-R scale (Sensorimotor and Activity Psychosis-Risk score; Damme et al., 2021), but only had this measure for ~30 participants and found null results, mirroring the results reported here.
+Note: We also studied a number of other speech measures that we do not discuss or report detailed results for here. In particular, we also studied pairwise overlap measures between individual stop categories (e.g., /p/-/t/), finding null results, mirroring the vowel overlap measures presented here. With regards to validation measures (i.e., non-speech motor measures), we also studied the SMAP-R scale (Sensorimotor and Activity Psychosis-Risk score; Damme et al., 2021), but only had this measure for ~30 participants and found null results, mirroring the results reported here. Finally, in post-hoc exploratory analyses, we also studied mean and variance speech measures, which we report on in SM 2.4 and SM 2.5.
+
+
+## Inspection of automated tool performance on our data
+
+The creators of the automated tools we use report high levels of reliability. However, to further validate these tools, we investigated the predicted speech measure values on our collected speech samples and compared them against established norms. Overall, we found that the predicted speech measure values matched expected average values, thus providing further evidence of the reliability of the automated tools we use.
+
+### DDKtor: Voice-Onset-Times
+
+As reported in the main text, the DDKtor software matches human annotations of diadochokinetic segment duration with correlations of *r*=0.85-0.90 and matches human annotation of diadochokinetic speech rate with correlations of *r*=0.94-0.97. The plotted density distributions for voiceless voice-onset-times (output from DDKtor on our collected diadochokinetic speech samples; Figure S\ref{fig:ddktor-reliability-plot}) match expectations, and provide additional evidence of DDKtor's reliability.
+
+```{r, ddktor-reliability-on-our-speech-samples, fig.cap = "\\label{fig:ddktor-reliability-plot} Density distribution of voiceless stop voice-onset-times (VOTs) in the diadochokinetic (DDK) speech samples, as output from the DDKtor software.", fig.width = 3, fig.height = 2.5}
+
+vots_ddk <- read.csv("../../ddk-automatic-acoustic-analysis/ddk-speech-measures/segments.csv")
+vots_ddk <- subset(vots_ddk, full_syll == 1 & extreme_value_withinparts == 0 & include == 1 & seg_type == 'Vot')
+vots_ddk$seg_type[vots_ddk$window_type == 'pa'] <- 'P'
+vots_ddk$seg_type[vots_ddk$window_type == 'ta'] <- 'T'
+vots_ddk$seg_type[vots_ddk$window_type == 'ka'] <- 'K'
+voiceless_density_ddk <-ggplot(subset(vots_ddk, seg_type %in% c('P','T','K')), aes(x=seg_duration, fill=seg_type)) + geom_density(alpha=0.4) + labs(title = 'Voiceless VOTs (DDK)', fill=NULL) + xlab('VOT (s)') + ylab("Density")
+voiceless_density_ddk
+
+```
+
+### AutoVOT: Voice-Onset-Times
+
+As reported in the main text, the AutoVOT software, which predicts voice-onset-times, parallels interrater reliability rates, with ~90% of its predicted voice-onset-times are within 10-15ms of gold-standard human annotation. Figure S\ref{fig:autovot-reliability-plot} shows the predict voice-onset-times for vowels in our collected read (top) and spontaneous (bottom) speech samples. As with DDKtor, this plot provides further evidence of AutoVOT's reliability, as the density plots match expectations based on previously-established norm voice-onset-time values.
+
+```{r, autovot-reliability-on-our-speech-samples, fig.cap = "\\label{fig:autovot-reliability-plot} Density distribution of voiceless and voiced stop voice-onset-times (VOTs) in the read (top) and spontaneous (bottom) speech samples, as output from the AutoVOT software.", fig.width = 6, fig.height = 4}
+
+vots_rp <- read.csv("../data/rp-final-vots.csv")
+voiced_density_rp <-ggplot(subset(vots_rp, seg_type %in% c('B','D','G')), aes(x=seg_duration, fill=seg_type)) + geom_density(alpha=0.4) + labs(title = 'Voiced VOTs (Read)', fill=NULL) + xlab('VOT (s)') + xlim(0,0.075) + ylab("Density")
+voiceless_density_rp <-ggplot(subset(vots_rp, seg_type %in% c('P','T','K')), aes(x=seg_duration, fill=seg_type)) + geom_density(alpha=0.4) + labs(title = 'Voiceless VOTs (Read)', fill=NULL) + xlab('VOT (s)') + ylab("Density")
+
+vots_pbj <- read.csv("../data/pbj-final-vots.csv")
+voiced_density_pbj <-ggplot(subset(vots_pbj, seg_type %in% c('B','D','G')), aes(x=seg_duration, fill=seg_type)) + geom_density(alpha=0.4) + labs(title = 'Voiced VOTs (Spontaneous)', fill=NULL) + xlab('VOT (s)') + xlim(0,0.075) + ylab("Density")
+voiceless_density_pbj <-ggplot(subset(vots_pbj, seg_type %in% c('P','T','K')), aes(x=seg_duration, fill=seg_type)) + geom_density(alpha=0.4) + labs(title = 'Voiceless VOTs (Spontaneous)', fill = NULL) + xlab('VOT (s)') + ylab("Density")
+
+ggarrange(voiceless_density_rp, voiced_density_rp, voiceless_density_pbj, voiced_density_pbj, ncol=2, nrow=2)
+
+```
+
+### FastTrack: Vowel Formants
+
+
+```{r, formant-accuracy}
+
+# Get DDK Formants
+formants_ddk <- read.csv("../data/ddk-segments.csv")
+formants_ddk <- subset(formants_ddk, full_syll == 1 & extreme_value_withinparts == 0 & include == 1 & seg_type == 'Vowel')
+summary_formants_ddk <- formants_ddk %>% group_by(seg_type) %>% summarise(cent.f1 = as.integer(mean(f1.50, na.rm = TRUE)), cent.f2 = as.integer(mean(f2.50, na.rm = TRUE)))
+
+# Get Rainbow Passage Formants
+formants_rp <- read.csv("../data/rp-final-vowels.csv")
+summary_formants_rp <- formants_rp %>% group_by(seg_type) %>% summarise(cent.f1 = as.integer(mean(f1.50, na.rm = TRUE)), cent.f2 = as.integer(mean(f2.50, na.rm = TRUE)))
+
+# Get PB&J Formants
+formants_pbj <- read.csv("../data/pbj-final-vowels.csv")
+summary_formants_pbj <- formants_pbj %>% group_by(seg_type) %>% summarise(cent.f1 = as.integer(mean(f1.50, na.rm = TRUE)), cent.f2 = as.integer(mean(f2.50, na.rm = TRUE)))
+
+# Hillenbrand formants
+hillenbrand <- read.csv("../data/hillenbrand-formants.csv")
+summary_formants <- merge(summary_formants_rp, summary_formants_pbj,by="seg_type")
+formant_accuracy_table <- merge(summary_formants,hillenbrand,by.x="seg_type", by.y="Vowel")
+colnames(formant_accuracy_table) <- c('Vowel', 'Read F1', 'Read F2', 'Spont. F1', 'Spont. F2', 'Ref Male F1', 'Ref Male F2', 'Ref Fem F1', 'Ref Fem F2')
+
+```
+
+
+FastTrack is reported to have an average error of ~20Hz and 98.9\% of vowels have errors of less than 5\% off from the human-annotated value. We inspected the performance of FastTrack on our data, by visualizing the extracted values and comparing the average value extracted from our data to the average formant values reported for American speakers by Hillenbrand et al. (1995). Figure S\ref{fig:formant-plots} shows the predicted F1/F2 formant values by speech task, and Table S\ref{tab:formant-accuracy-table} shows the average F1/F2 formant values by speech task (combined for male/female participants) side-by-side with those reported in Hillenbrand et al. (1995), separated by speaker sex. While we do not include diadochokinetic speech in Table S\ref{tab:formant-accuracy-table} (as participants only produced one vowel type in this task), the average formant value output by FastTrack on that task (F1: `r summary_formants_ddk$cent.f1[summary_formants_ddk$seg_type == 'Vowel']`; F2: `r summary_formants_ddk$cent.f2[summary_formants_ddk$seg_type == 'Vowel']`) also closely matched average values reported by Hillenbrand et al. (1995). Overall, these results provide confidence that the extracted formant values are reliable, across all speech sample types that we study.
+
+```{r, formant-accuracy-table}
+foracc_tab <- apa_table(formant_accuracy_table, caption = "Comparison of average predicted F1/F2 values for the read and spontaneous speech subtasks (combined for male/female participants) to reference average values from Hillenbrand et al. (1995), split by sex. Spont. = Spontaneous; Ref. = Reference; Fem. = Female")
+foracc_tab
+```
+
+```{r, formant-accuracy-plots, fig.cap = "\\label{fig:formant-plots} F1/F2 values predicted by FastTrack for each vowel in our Read speech (left) and Spontaneous speech (right) samples, colored by their vowel type. Overall, the F1/F2 values appear valid and reliable across both speech sample types.", fig.height = 4, fig.width = 6}
+
+rp_sub <- subset(formants_rp, seg_type %in% formant_accuracy_table$Vowel)
+pbj_sub <- subset(formants_pbj, seg_type %in% formant_accuracy_table$Vowel)
+forms_rp_plot <- ggplot(rp_sub, aes(x=f1.50, y=f2.50, color = seg_type)) + geom_point() + ggtitle("Read Speech Vowels") + xlab("F1 (50%)") + ylab("F2 (50%)") + theme(plot.title = element_text(hjust = 0.5)) + theme(legend.title=element_blank())
+forms_pbj_plot <- ggplot(pbj_sub, aes(x=f1.50, y=f2.50, color = seg_type)) + geom_point() + ggtitle("Spontaneous Speech Vowels") + xlab("F1 (50%)") + ylab("F2 (50%)") + theme(plot.title = element_text(hjust = 0.5)) + theme(legend.title=element_blank())
+
+formant_plot <- ggarrange(forms_rp_plot, forms_pbj_plot, ncol = 2, nrow = 1, common.legend = TRUE)
+formant_plot
+
+```
 
 # Results
 
@@ -132,22 +229,36 @@ pbj <- merge(pbj, clinical, by.x = 'participant', by.y = 'Participant')
 
 ```{r, ddk-grpdiff-stats}
 # b. Group difference stats 
-ddk$part_grp <- factor(ddk$part_grp)
+
+ddk$part_grp <- relevel(factor(ddk$part_grp), ref = "Healthy Controls")
 # Vowel Measures
-voweldur_amr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldur_smr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-voweldisp_amr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldisp_smr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-voweldispdelta_amr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldispdelta_smr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'smr'), family = 'binomial')
-sylldur_amr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-sylldur_smr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-intersylldur_amr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-intersylldur_smr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+voweldur_amr.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+voweldur_smr.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+voweldisp_amr.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+voweldisp_smr.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+voweldispdelta_amr.stats <- lm(formant_delta_var ~ part_grp, data = subset(ddk, subtask == 'amr'))
+voweldispdelta_smr.stats <- lm(formant_delta_var ~ part_grp, data = subset(ddk, subtask == 'smr'))
+sylldur_amr.stats <- lm(log(coeffvar_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+sylldur_smr.stats <- lm(log(coeffvar_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+intersylldur_amr.stats <- lm(log(coeffvar_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+intersylldur_smr.stats <- lm(log(coeffvar_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+
+# ddk$part_grp <- factor(ddk$part_grp)
+# # Vowel Measures
+# voweldur_amr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# voweldur_smr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# voweldisp_amr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# voweldisp_smr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# voweldispdelta_amr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# voweldispdelta_smr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# sylldur_amr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# sylldur_smr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# intersylldur_amr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# intersylldur_smr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
 
 ```
 
-Here, we provide details of analyses of all acoustic speech features tested that were not discussed in the main paper (Figure S\ref{fig:ddk-grpdiff-plots}). In particular, none of the following other speech measures significantly predicted CHR vs. HC group in either the SMR (“pataka”) or AMR (“papapa”) subtasks: coefficient of variation of vowel duration (AMR: `r grpdiff_output(voweldur_amr.stats, "log_coeffvar_vowel_duration")`; SMR: `r grpdiff_output(voweldur_smr.stats, "log_coeffvar_vowel_duration")`), change in formant dispersion between 20% and 50% of the vowel (AMR: `r grpdiff_output(voweldispdelta_amr.stats, "formant_delta_var")`; SMR: `r grpdiff_output(voweldispdelta_smr.stats, "formant_delta_var")`), coefficient of variation of syllable duration (AMR: `r grpdiff_output(sylldur_amr.stats, "log(coeffvar_syll_duration)")`; SMR: `r grpdiff_output(sylldur_smr.stats, "log(coeffvar_syll_duration)")`), and coefficient of variation of intersyllable duration (AMR: `r grpdiff_output(intersylldur_amr.stats, "log(coeffvar_intersyll_duration)")`; SMR: `r grpdiff_output(intersylldur_smr.stats, "log(coeffvar_intersyll_duration)")`), though some approached significance. Average formant dispersion at 20% of the vowel significantly predicted CHR vs HC group in the AMR subtask (`r grpdiff_output(voweldisp_amr.stats, "log(formant_dispersion.20)")`), but not the SMR (though it approached significance: `r grpdiff_output(voweldisp_smr.stats, "log(formant_dispersion.20)")`).
+Here, we provide details of analyses of all acoustic speech features tested that were not discussed in the main paper (Figure S\ref{fig:ddk-grpdiff-plots}). In particular, none of the following other speech measures significantly **differed between** the CHR vs. HC groups in either the SMR (“pataka”) or AMR (“papapa”) subtasks: coefficient of variation of vowel duration (AMR: `r grpdiff_output(voweldur_amr.stats, "log_coeffvar_vowel_duration")`; SMR: `r grpdiff_output(voweldur_smr.stats, "log_coeffvar_vowel_duration")`), change in formant dispersion between 20% and 50% of the vowel (AMR: `r grpdiff_output(voweldispdelta_amr.stats, "formant_delta_var")`; SMR: `r grpdiff_output(voweldispdelta_smr.stats, "formant_delta_var")`), coefficient of variation of syllable duration (AMR: `r grpdiff_output(sylldur_amr.stats, "log(coeffvar_syll_duration)")`; SMR: `r grpdiff_output(sylldur_smr.stats, "log(coeffvar_syll_duration)")`), and coefficient of variation of intersyllable duration (AMR: `r grpdiff_output(intersylldur_amr.stats, "log(coeffvar_intersyll_duration)")`; SMR: `r grpdiff_output(intersylldur_smr.stats, "log(coeffvar_intersyll_duration)")`), though some approached significance. Average formant dispersion at 20% of the vowel significantly predicted CHR vs HC group in the AMR subtask (`r grpdiff_output(voweldisp_amr.stats, "log(formant_dispersion.20)")`), but not the SMR (though it approached significance: `r grpdiff_output(voweldisp_smr.stats, "log(formant_dispersion.20)")`).
 
 ```{r, ddk-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
 # a. Group difference plots
@@ -222,7 +333,7 @@ Results are presented in Figure S\ref{fig:ddk-vot-corr-plots}. We found that var
 ## VOICELESS VOTs
 # Voiceless VOT vs. SIPS (AMR)
 # SIPS_Ptotal, SIPS_Ntotal,SIPS_Dtotal,SIPS_G3
-vot_sips_ptotal_amr <- ggplot(subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr'), aes(x=log_coeffvar_vot_duration, y=SIPS_Ptotal)) + geom_point() + xlab('Voiceless VOT\nCoefficient of Variation (Log)') + ylab('SIPS Positive Total') + geom_smooth(method = "lm", se = TRUE)
+vot_sips_ptotal_amr <- ggplot(subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr'), aes(x=log_coeffvar_vot_duration, y=SIPS_Ptotal)) + geom_point() + xlab('Voiceless VOT\nCoefficient of Variation (Log)') + ylab('SIPS Positive Total') + geom_smooth(method = "lm", se = TRUE) # + annotate("text", x = -Inf, y = Inf, label = paste0("r = ", ), hjust = -.2, vjust = 2, color = 'blue')
 vot_sips_ntotal_amr <- ggplot(subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr'), aes(x=log_coeffvar_vot_duration, y=SIPS_Ntotal)) + geom_point() + xlab('Voiceless VOT\nCoefficient of Variation (Log)') + ylab('SIPS Negative Total') + geom_smooth(method = "lm", se = TRUE)
 vot_sips_dtotal_amr <- ggplot(subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Dtotal)), aes(x=log_coeffvar_vot_duration, y=SIPS_Dtotal)) + geom_point() + xlab('Voiceless VOT\nCoefficient of Variation (Log)') + ylab('SIPS Disorganized Total') + geom_smooth(method = "lm", se = TRUE)
 vot_sips_g3_amr <- ggplot(subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_G3)), aes(x=log_coeffvar_vot_duration, y=SIPS_G3)) + geom_point() + xlab('Voiceless VOT\nCoefficient of Variation (Log)') + ylab('Motor Difficulties\nSIPS G3') + geom_smooth(method = "lm", se = TRUE)
@@ -355,13 +466,13 @@ ddk_speechrate_corr_plot
 
 ```{r, rp-grpdiff-stats}
 
-rp$part_grp <- factor(rp$part_grp)
-voiced_vot_rp.stats <- glm(part_grp ~ log_coeffvar_vot_voiced_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
-voweldur_rp.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
-voweldisp_rp.stats <- glm(part_grp ~ log(formant_dispersion.20), data = rp, family = 'binomial')
-voweldispdelta_rp.stats <- glm(part_grp ~ formant_delta_var, data = rp, family = 'binomial')
-vowelphoncomp_rp.stats <- glm(part_grp ~ log_formant_phonetic_competition, data = rp, family = 'binomial')
-pauses_rp.stats <- glm(part_grp ~ log_n_pauses_per_word, data = rp, family = 'binomial')
+rp$part_grp <- relevel(factor(rp$part_grp), ref = "Healthy Controls")
+voiced_vot_rp.stats <- lm(log_coeffvar_vot_voiced_duration ~ part_grp + log_avg_local_speech_rate, data = rp)
+voweldur_rp.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log_avg_local_speech_rate, data = rp)
+voweldisp_rp.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = rp)
+voweldispdelta_rp.stats <- lm(formant_delta_var ~ part_grp, data = rp)
+vowelphoncomp_rp.stats <- lm(log_formant_phonetic_competition ~ part_grp, data = rp)
+pauses_rp.stats <- lm(log_n_pauses_per_word ~ part_grp, data = rp)
 
 ```
 
@@ -498,14 +609,13 @@ ddkrate_corr_rp
 
 ```{r, pbj-grpdiff-stats}
 
-pbj$part_grp <- factor(pbj$part_grp)
-voiced_vot_pbj.stats <- glm(part_grp ~ log_coeffvar_vot_voiced_duration + log_avg_local_speech_rate, data = subset(pbj, !is.infinite(log_coeffvar_vot_voiced_duration)), family = 'binomial')
-voweldur_pbj.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log_avg_local_speech_rate, data = pbj, family = 'binomial')
-voweldisp_pbj.stats <- glm(part_grp ~ log(formant_dispersion.20), data = pbj, family = 'binomial')
-voweldispdelta_pbj.stats <- glm(part_grp ~ formant_delta_var, data = pbj, family = 'binomial')
-vowelphoncomp_pbj.stats <- glm(part_grp ~ log_formant_phonetic_competition, data = subset(pbj, !is.na(log_formant_phonetic_competition)), family = 'binomial')
-pauses_pbj.stats <- glm(part_grp ~ log_n_pauses_per_word, data = pbj, family = 'binomial')
-
+pbj$part_grp <- relevel(factor(pbj$part_grp), ref = "Healthy Controls")
+voiced_vot_pbj.stats <- lm(log_coeffvar_vot_voiced_duration ~ part_grp + log_avg_local_speech_rate, data = subset(pbj, !is.infinite(log_coeffvar_vot_voiced_duration)))
+voweldur_pbj.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log_avg_local_speech_rate, data = pbj)
+voweldisp_pbj.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = pbj)
+voweldispdelta_pbj.stats <- lm(formant_delta_var ~ part_grp, data = pbj)
+vowelphoncomp_pbj.stats <- lm(log_formant_phonetic_competition ~ part_grp, data = subset(pbj, !is.na(log_formant_phonetic_competition)))
+pauses_pbj.stats <- lm(log_n_pauses_per_word ~ part_grp, data = pbj)
 
 ```
 
@@ -539,31 +649,454 @@ diffs_rp
 
 ```
 
+## Results studying variance of speech measures (instead of coefficients of variation)
+
+### Diadochokinetic Speech Tasks
+
+```{r, ddk-var-measure-results}
+
+vot_amr_var.stats <- lm(log(var_vot_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+vot_smr_var.stats <- lm(log(var_vot_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+ddkrate_amr_var.stats <- lm(log(var_ddk_rate) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+ddkrate_smr_var.stats <- lm(log(var_ddk_rate) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+
+voweldur_amr_var.stats <- lm(log(var_vowel_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+voweldur_smr_var.stats <- lm(log(var_vowel_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+sylldur_amr_var.stats <- lm(log(var_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+sylldur_smr_var.stats <- lm(log(var_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+intersylldur_amr_var.stats <- lm(log(var_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+intersylldur_smr_var.stats <- lm(log(var_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+
+```
+
+Results are plotted in Figure S\ref{fig:ddk-var-grpdiff-plots}. CHR participants exhibited significantly more variance in their voiceless stop consonant voice-onset-times than HC in the AMR trials (`r grpdiff_output(vot_amr_var.stats, "log(var_vot_duration)")`), and near-significantly more variance than HC in the SMR trials (`r grpdiff_output(vot_smr_var.stats, "log(var_vot_duration)")`). In addition, CHR participants produced more variance in their speech rates across both AMR (`r grpdiff_output(ddkrate_amr_var.stats, "log(var_ddk_rate)")`) and SMR trials (`r grpdiff_output(ddkrate_smr_var.stats, "log(var_ddk_rate)")`). All other following speech measures showed no group differences: variance in vowel duration (AMR: `r grpdiff_output(voweldur_amr_var.stats, "log(var_vowel_duration)")`; SMR: `r grpdiff_output(voweldur_smr_var.stats, "log(var_vowel_duration)")`), variance in syllable duration (AMR: `r grpdiff_output(sylldur_amr_var.stats, "log(var_syll_duration)")`; SMR: `r grpdiff_output(sylldur_smr_var.stats, "log(var_syll_duration)")`), and variance in intersyllable duration (AMR: `r grpdiff_output(intersylldur_amr_var.stats, "log(var_intersyll_duration)")`; SMR: `r grpdiff_output(intersylldur_smr_var.stats, "log(var_intersyll_duration)")`), mirroring what was observed with the corresponding coefficients of variation.
+
+```{r, ddk-var-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+var_ddkrate_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_ddk_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Speech Rate Variance (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_ddkrate_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(var_ddk_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Speech Rate Variance (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_vot_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(var_vot_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vowel_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vowel_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(var_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_syll_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_syll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Syllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_syll_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(var_syll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Syllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_intersyll_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_intersyll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Intersyllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_intersyll_smr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(var_intersyll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Intersyllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r ddk-var-grpdiff-intermediate-plots, fig.width = 11, fig.height = 6}
+
+var_grpdiff_amr <- ggarrange(var_ddkrate_amr, var_vot_amr, var_vowel_amr, var_syll_amr, var_intersyll_amr, ncol = 3, nrow = 2)
+var_grpdiff_smr <- ggarrange(var_ddkrate_smr, var_vot_smr, var_vowel_smr, var_syll_smr, var_intersyll_smr, ncol = 3, nrow = 2)
+
+```
+
+```{r ddk-var-grpdiff-plots, fig.cap = "\\label{fig:ddk-var-grpdiff-plots} Group differences in speech measure *variance* in the (A) Diadochokinetic AMR or (B) Diadochokinetic SMR subtasks. Results largely mirror coefficient of variation results, with significant or near-significant group differences in speech rate variance and voiceless voice-onset-time variance. Each black dot represents one participant; the white dot represents the average value across participants.", fig.width = 11, fig.height = 11}
+
+var_ddk_grpdiff <- ggarrange(labels = c("A", "B"), ncol = 1, nrow = 2,
+  annotate_figure(var_grpdiff_amr, text_grob("Diadochokinetic-AMR (papapa/tatata/kakaka) Speech Task", color = "black", face = "bold", size = 14)),
+  annotate_figure(var_grpdiff_smr, text_grob("Diadochokinetic-SMR (pataka/katapa) Speech Task", color = "black", face = "bold", size = 14)))
+var_ddk_grpdiff
+
+```
+
+### Read Speech
+
+```{r, rp-var-measure-results}
+voiceless_vot_rp_var.stats <- lm(log(var_vot_voiceless_duration) ~ part_grp + log(avg_local_speech_rate), data = rp)
+voiced_vot_rp_var.stats <- lm(log(var_vot_voiced_duration) ~ part_grp + log(avg_local_speech_rate), data = rp)
+ddkrate_rp_var.stats <- lm(log(var_local_speech_rate) ~ part_grp + log(avg_local_speech_rate), data = rp)
+voweldur_rp_var.stats <- lm(log(var_vowel_duration) ~ part_grp + log(avg_local_speech_rate), data = rp)
+```
+
+In the read speech task, we found no significant CHR vs. HC group differences in variance in speech rate (`r grpdiff_output(ddkrate_rp_var.stats, "log(var_local_speech_rate)")`), variance in voiceless voice-onset-times (`r grpdiff_output(voiceless_vot_rp_var.stats, "log(var_vot_voiceless_duration)")`), variance in voiced voice-onset-times (`r grpdiff_output(voiced_vot_rp_var.stats, "log(var_vot_voiced_duration)")`), or variance in vowel durations (`r grpdiff_output(voweldur_rp_var.stats, "log(var_vowel_duration)")`) (Figure S\ref{fig:rp-var-grpdiff-plots}). However, we note that variance in speech rate and variance in voiceless voice-onset-times showed potential trends toward significance.
+
+```{r, rp-var-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+var_ddkrate_rp <- ggplot(data=rp, aes(y=log(var_local_speech_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_voiceless_rp <- ggplot(data=rp, aes(y=log(var_vot_voiceless_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_voiced_rp <- ggplot(data=rp, aes(y=log(var_vot_voiced_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiced VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vowel_rp <- ggplot(data=rp, aes(y=log(var_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r, rp-var-grpdiff-plots, fig.width = 8, fig.height = 5, fig.cap = "\\label{fig:rp-var-grpdiff-plots} We find no significant CHR vs HC group differences in *variance* speech measures in the reading task, though differences in speech rate variance and voiceless voice-onset-time variance are trending towards significance. Each black dot represents one participant; the white dot represents the average value across participants."}
+
+var_diffs_rp <- ggarrange(var_ddkrate_rp, var_vot_voiceless_rp, var_vot_voiced_rp, var_vowel_rp, ncol = 2, nrow = 2)
+var_diffs_rp
+
+```
+
+### Spontaneous Speech
+
+```{r, pbj-var-measure-results}
+voiceless_vot_pbj_var.stats <- lm(log(var_vot_voiceless_duration) ~ part_grp + log(avg_local_speech_rate), data = pbj)
+voiced_vot_pbj_var.stats <- lm(log(var_vot_voiced_duration) ~ part_grp + log(avg_local_speech_rate), data = subset(pbj, !is.infinite(log(var_vot_voiced_duration))))
+ddkrate_pbj_var.stats <- lm(log(var_local_speech_rate) ~ part_grp + log(avg_local_speech_rate), data = pbj)
+voweldur_pbj_var.stats <- lm(log(var_vowel_duration) ~ part_grp + log(avg_local_speech_rate), data = pbj)
+```
+
+Finally, in the spontaneous speech task, we found no significant CHR vs. HC group differences in speech rate variance (`r grpdiff_output(ddkrate_pbj_var.stats, "log(var_local_speech_rate)")`), variance in voiceless voice-onset-times (`r grpdiff_output(voiceless_vot_pbj_var.stats, "log(var_vot_voiceless_duration)")`), variance in voiced voice-onset-times (`r grpdiff_output(voiced_vot_pbj_var.stats, "log(var_vot_voiced_duration)")`), or variance in vowel durations (`r grpdiff_output(voweldur_pbj_var.stats, "log(var_vowel_duration)")`) (Figure S\ref{fig:pbj-var-grpdiff-plots}), mirroring what we observed with coefficients of variation in the main text.
+
+```{r, pbj-var-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+var_ddkrate_pbj <- ggplot(data=pbj, aes(y=log(var_local_speech_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_voiceless_pbj <- ggplot(data=pbj, aes(y=log(var_vot_voiceless_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vot_voiced_pbj <- ggplot(data=pbj, aes(y=log(var_vot_voiced_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Voiced VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+var_vowel_pbj <- ggplot(data=pbj, aes(y=log(var_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Variance in Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r, pbj-var-grpdiff-plots, fig.width = 8, fig.height = 5, fig.cap = "\\label{fig:pbj-var-grpdiff-plots} We find no significant CHR vs HC group differences in *variance* speech measures in the reading task, though differences in speech rate variance and voiceless voice-onset-time variance are trending towards significance. Each black dot represents one participant; the white dot represents the average value across participants."}
+
+var_diffs_pbj <- ggarrange(var_ddkrate_pbj, var_vot_voiceless_pbj, var_vot_voiced_pbj, var_vowel_pbj, ncol = 2, nrow = 2)
+var_diffs_pbj
+
+```
+
+
+## Results studying mean speech measures
+
+The main text focused on coefficient of variation measures. In exploratory, post-hoc analyses, we also studied whether we observed group differences in *mean* speech measures. In particular, we tested whether there were CHR vs. HC group differences in average voice-onset-times, average vowel durations, average speech rates, and, in the diadochokinetic speech tasks, average syllable and intersyllable durations. Past work has found that individuals with and at-risk for psychosis speaker slower than healthy controls, so we might expect to find a similar effect here, as well as evidence that CHR participants produce longer consonants, vowels, syllables, and intersyllable durations. However, we found no evidence CHR vs. HC group differences in speech rate or consonant/vowel/syllable/intersyllable durations. We present these results by speech task. 
+
+### Diadochokinetic Speech Task
+
+```{r, ddk-mean-measure-results}
+
+vot_amr_mean.stats <- lm(log(avg_vot_duration) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+vot_smr_mean.stats <- lm(log(avg_vot_duration) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+ddkrate_amr_mean.stats <- lm(log(avg_ddk_rate) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+ddkrate_smr_mean.stats <- lm(log(avg_ddk_rate) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+
+voweldur_amr_mean.stats <- lm(log(avg_vowel_duration) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+voweldur_smr_mean.stats <- lm(log(avg_vowel_duration) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+sylldur_amr_mean.stats <- lm(log(avg_syll_duration) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+sylldur_smr_mean.stats <- lm(log(avg_syll_duration) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+intersylldur_amr_mean.stats <- lm(log(avg_intersyll_duration) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+intersylldur_smr_mean.stats <- lm(log(avg_intersyll_duration) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+
+```
+
+For the diadochokinetic speech tasks, none of the following speech measures differed significantly between the CHR vs. HC groups in either the SMR ("pataka") or AMR ("papapa") subtasks (Figure S\ref{fig:ddk-mean-grpdiff-plots}): mean speech rate (AMR: `r grpdiff_output(ddkrate_amr_mean.stats, "log(avg_ddk_rate)")`; SMR: `r grpdiff_output(ddkrate_smr_mean.stats, "log(avg_ddk_rate)")`), mean voiceless voice-onset-time (AMR: `r grpdiff_output(vot_amr_mean.stats, "log(avg_vot_duration)")`; SMR: `r grpdiff_output(vot_smr_mean.stats, "log(avg_vot_duration)")`), mean vowel duration (AMR: `r grpdiff_output(voweldur_amr_mean.stats, "log(avg_vowel_duration)")`; SMR: `r grpdiff_output(voweldur_smr_mean.stats, "log(avg_vowel_duration)")`), mean syllable duration (AMR: `r grpdiff_output(sylldur_amr_mean.stats, "log(avg_syll_duration)")`; SMR: `r grpdiff_output(sylldur_smr_mean.stats, "log(avg_syll_duration)")`), and mean intersyllable duration (AMR: `r grpdiff_output(intersylldur_amr_mean.stats, "log(avg_intersyll_duration)")`; SMR: `r grpdiff_output(intersylldur_smr_mean.stats, "log(avg_intersyll_duration)")`).
+
+```{r, ddk-mean-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+mean_ddkrate_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_ddk_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_ddkrate_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(avg_ddk_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_vot_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(avg_vot_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vowel_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vowel_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(avg_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_syll_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_syll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Syllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_syll_smr <- ggplot(data=subset(ddk, subtask == 'smr'), aes(y=log(avg_syll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Syllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_intersyll_amr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_intersyll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Intersyllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_intersyll_smr <- ggplot(data=subset(ddk, subtask == 'amr'), aes(y=log(avg_intersyll_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Intersyllable Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r ddk-mean-grpdiff-intermediate-plots, fig.width = 11, fig.height = 6}
+
+mean_grpdiff_amr <- ggarrange(mean_ddkrate_amr, mean_vot_amr, mean_vowel_amr, mean_syll_amr, mean_intersyll_amr, ncol = 3, nrow = 2)
+mean_grpdiff_smr <- ggarrange(mean_ddkrate_smr, mean_vot_smr, mean_vowel_smr, mean_syll_smr, mean_intersyll_smr, ncol = 3, nrow = 2)
+
+```
+
+```{r ddk-mean-grpdiff-plots, fig.cap = "\\label{fig:ddk-mean-grpdiff-plots} We observed no significant group differences in *mean* speech measure values in either the (A) Diadochokinetic AMR or (B) Diadochokinetic SMR subtasks. Each black dot represents one participant; the white dot represents the average value across participants.", fig.width = 11, fig.height = 11}
+
+mean_ddk_grpdiff <- ggarrange(labels = c("A", "B"), ncol = 1, nrow = 2,
+  annotate_figure(mean_grpdiff_amr, text_grob("Diadochokinetic-AMR (papapa/tatata/kakaka) Speech Task", color = "black", face = "bold", size = 14)),
+  annotate_figure(mean_grpdiff_smr, text_grob("Diadochokinetic-SMR (pataka/katapa) Speech Task", color = "black", face = "bold", size = 14)))
+mean_ddk_grpdiff
+
+```
+
+### Read Speech Task
+
+```{r, rp-mean-measure-results}
+
+voiceless_vot_rp_mean.stats <- lm(log(avg_vot_voiceless_duration) ~ part_grp, data = rp)
+voiced_vot_rp_mean.stats <- lm(log(avg_vot_voiced_duration) ~ part_grp, data = rp)
+ddkrate_rp_mean.stats <- lm(log(avg_local_speech_rate) ~ part_grp, data = rp)
+voweldur_rp_mean.stats <- lm(log(avg_vowel_duration) ~ part_grp, data = rp)
+
+```
+
+In the read speech task, none of the following speech measures differed significantly between the CHR vs. HC groups (Figure S\ref{fig:rp-mean-grpdiff-plots}): mean speech rate (`r grpdiff_output(ddkrate_rp_mean.stats, "log(avg_local_speech_rate)")`), mean voiceless voice-onset-time (`r grpdiff_output(voiceless_vot_rp_mean.stats, "log(avg_vot_voiceless_duration)")`), mean voiced voice-onset-time (`r grpdiff_output(voiced_vot_rp_mean.stats, "log(avg_vot_voiced_duration)")`), and mean vowel duration (`r grpdiff_output(voweldur_rp_mean.stats, "log(avg_vowel_duration)")`).
+
+
+```{r, rp-mean-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+mean_ddkrate_rp <- ggplot(data=rp, aes(y=log(avg_local_speech_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_voiceless_rp <- ggplot(data=rp, aes(y=log(avg_vot_voiceless_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_voiced_rp <- ggplot(data=rp, aes(y=log(avg_vot_voiced_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiced VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vowel_rp <- ggplot(data=rp, aes(y=log(avg_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r, rp-mean-grpdiff-plots, fig.width = 8, fig.height = 5, fig.cap = "\\label{fig:rp-mean-grpdiff-plots} We find no significant CHR vs HC group differences in *mean* speech measures in the reading task. Each black dot represents one participant; the white dot represents the average value across participants."}
+
+mean_diffs_rp <- ggarrange(mean_ddkrate_rp, mean_vot_voiceless_rp, mean_vot_voiced_rp, mean_vowel_rp, ncol = 2, nrow = 2)
+mean_diffs_rp
+
+```
+
+
+### Spontaneous Speech Task
+
+```{r, pbj-mean-measure-results}
+
+voiceless_vot_pbj_mean.stats <- lm(log(avg_vot_voiceless_duration) ~ part_grp, data = pbj)
+voiced_vot_pbj_mean.stats <- lm(log(avg_vot_voiced_duration) ~ part_grp, data = pbj)
+ddkrate_pbj_mean.stats <- lm(log(avg_local_speech_rate) ~ part_grp, data = pbj)
+voweldur_pbj_mean.stats <- lm(log(avg_vowel_duration) ~ part_grp, data = pbj)
+
+```
+
+Finally, in the spontaneous speech task, none of the following speech measures differed significantly between the CHR vs. HC groups (Figure S\ref{fig:pbj-mean-grpdiff-plots}): mean speech rate (`r grpdiff_output(ddkrate_pbj_mean.stats, "log(avg_local_speech_rate)")`), mean voiceless voice-onset-time (`r grpdiff_output(voiceless_vot_pbj_mean.stats, "log(avg_vot_voiceless_duration)")`), mean voiced voice-onset-time (`r grpdiff_output(voiced_vot_pbj_mean.stats, "log(avg_vot_voiced_duration)")`), and mean vowel duration (`r grpdiff_output(voweldur_pbj_mean.stats, "log(avg_vowel_duration)")`).
+
+```{r, pbj-mean-grpdiff-individual-plots, fig.width = 3, fig.height = 3}
+
+mean_ddkrate_pbj <- ggplot(data=pbj, aes(y=log(avg_local_speech_rate), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Speech Rate (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_voiceless_pbj <- ggplot(data=pbj, aes(y=log(avg_vot_voiceless_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiceless VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vot_voiced_pbj <- ggplot(data=pbj, aes(y=log(avg_vot_voiced_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Voiced VOT (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+mean_vowel_pbj <- ggplot(data=pbj, aes(y=log(avg_vowel_duration), x=part_grp, fill=part_grp)) + geom_boxplot(outlier.color=NA) + geom_jitter(width=0.15) + ylab("Mean Vowel Duration (Log)") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.text.x = element_text(size=11.5), axis.title.y = element_text(size=12)) + stat_summary(fun=mean, geom="point", shape=20, size=6, color="white", fill="white")
+
+```
+
+```{r, pbj-mean-grpdiff-plots, fig.width = 8, fig.height = 5, fig.cap = "\\label{fig:pbj-mean-grpdiff-plots} We find no significant CHR vs HC group differences in *mean* speech measures in the spontaneous speech task. Each black dot represents one participant; the white dot represents the average value across participants."}
+
+mean_diffs_pbj <- ggarrange(mean_ddkrate_pbj, mean_vot_voiceless_pbj, mean_vot_voiced_pbj, mean_vowel_pbj, ncol = 2, nrow = 2)
+mean_diffs_pbj
+
+```
+
+
+## Categorization accuracy results
+
+For each of the speech measures that significantly differed between CHR vs. HC participants, we also run logistic regression models predicting CHR vs. HC status from the acoustic measure to test the categorization accuracy/discriminability of the speech measures. In contrast to previous results, we present these results by speech measure.
+
+### Voiceless voice-onset-time 
+
+```{r, vot-categorization-models}
+
+# AMR
+vot_amr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+ddk$vot_amr.probs[ddk$subtask == 'amr'] <- vot_amr.stats %>% predict(subset(ddk, subtask == 'amr'), type = "response")
+ddk$vot_amr.preds[ddk$subtask == 'amr'] <- ifelse(ddk$vot_amr.probs[ddk$subtask == 'amr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$vot_amr.correct[ddk$subtask == 'amr'] <- ifelse(ddk$vot_amr.preds[ddk$subtask == 'amr'] == ddk$part_grp[ddk$subtask == 'amr'],1,0)
+
+#SMR
+vot_smr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+ddk$vot_smr.probs[ddk$subtask == 'smr'] <- vot_smr.stats %>% predict(subset(ddk, subtask == 'smr'), type = "response")
+ddk$vot_smr.preds[ddk$subtask == 'smr'] <- ifelse(ddk$vot_smr.probs[ddk$subtask == 'smr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$vot_smr.correct[ddk$subtask == 'smr'] <- ifelse(ddk$vot_smr.preds[ddk$subtask == 'smr'] == ddk$part_grp[ddk$subtask == 'smr'],1,0)
+
+# RP
+vot_rp.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
+rp$vot_rp.probs <- vot_rp.stats %>% predict(rp, type = "response")
+rp$vot_rp.preds <- ifelse(rp$vot_rp.probs > 0.50, "Clinical High-Risk", "Healthy Controls")
+rp$vot_rp.correct <- ifelse(rp$vot_rp.preds == rp$part_grp,1,0)
+
+# Don't look at PBJ because it's not significant
+
+```
+
+
+We find that the degree of variability in the voice-onset-time of voiceless consonants predicts CHR vs. HC status with `r myround(mean(ddk$vot_amr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-AMR subtask, `r myround(mean(ddk$vot_smr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-SMR subtask, and `r myround(mean(rp$vot_rp.correct, na.rm = TRUE)*100)`\% accuracy in the read subtask (with a 50\% probability cut-off in the logistic regression). We present the full ROC curve (with sensitivity and specificity values) in Figure S\ref{fig:vot-roc-plot}. While the categorization results are considered inadequate (Hosmer et al., 2013; Mandrekar, 2010), we would not expect speech measures on their own to be able to classify CHR vs. HC, so the fact that the measures perform above chance is in itself promising. This suggests that, combined with other measures, speech measures could potentially be useful in identifying individuals at high-risk for psychosis. 
+
+
+```{r, roc-curves-vot, fig.cap = "\\label{fig:vot-roc-plot}Specificity/sensitivity trade-off for the logistic regression categorization model predicting CHR vs. HC status from the coefficient of variation of voiceless voice-onset-time."}
+
+# Prepare VOT ROC curve
+roc_vot_amr <- roc(subset(ddk, subtask == 'amr')$part_grp, subset(ddk, subtask == 'amr')$vot_amr.probs)
+roc_vot_smr <- roc(subset(ddk, subtask == 'smr')$part_grp, subset(ddk, subtask == 'smr')$vot_smr.probs)
+roc_vot_rp <- roc(rp$part_grp, rp$vot_rp.probs)
+
+roc_list <- list()
+roc_list[[paste0("Diadochokinetic AMR (AUC=", myround(as.numeric(roc_vot_amr$auc)),")")]] <- roc_vot_amr
+roc_list[[paste0("Diadochokinetic SMR (AUC=", myround(as.numeric(roc_vot_smr$auc)),")")]] <- roc_vot_smr
+roc_list[[paste0("Read Speech (AUC=", myround(as.numeric(roc_vot_rp$auc)),")")]] <- roc_vot_rp
+
+ 
+roc_vot <- ggroc(roc_list) + geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color = "grey", linetype = "dashed") + ggtitle("ROC Curve for Voiceless Voice-Onset-Time") + theme(legend.title=element_blank()) + xlab("Specificity") + ylab("Sensitivity")
+# roc_vot %>% mutate(auclabel = paste0("Diadochokinetic AMR (AUC=", myround(as.numeric(roc_vot_amr$auc)),")") )
+roc_vot
+
+```
+
+
+
+### Speech rate
+
+```{r, ddkrate-categorization-models}
+
+# AMR
+ddkrate_amr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'amr'), family = 'binomial')
+ddk$ddkrate_amr.probs[ddk$subtask == 'amr'] <- ddkrate_amr.stats %>% predict(subset(ddk, subtask == 'amr'), type = "response")
+ddk$ddkrate_amr.preds[ddk$subtask == 'amr'] <- ifelse(ddk$ddkrate_amr.probs[ddk$subtask == 'amr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$ddkrate_amr.correct[ddk$subtask == 'amr'] <- ifelse(ddk$ddkrate_amr.preds[ddk$subtask == 'amr'] == ddk$part_grp[ddk$subtask == 'amr'],1,0)
+
+#SMR
+ddkrate_smr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'smr'), family = 'binomial')
+ddk$ddkrate_smr.probs[ddk$subtask == 'smr'] <- ddkrate_smr.stats %>% predict(subset(ddk, subtask == 'smr'), type = "response")
+ddk$ddkrate_smr.preds[ddk$subtask == 'smr'] <- ifelse(ddk$ddkrate_smr.probs[ddk$subtask == 'smr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$ddkrate_smr.correct[ddk$subtask == 'smr'] <- ifelse(ddk$ddkrate_smr.preds[ddk$subtask == 'smr'] == ddk$part_grp[ddk$subtask == 'smr'],1,0)
+
+# RP
+ddkrate_rp.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = rp, family = 'binomial')
+rp$ddkrate_rp.probs <- ddkrate_rp.stats %>% predict(rp, type = "response")
+rp$ddkrate_rp.preds <- ifelse(rp$ddkrate_rp.probs > 0.50, "Clinical High-Risk", "Healthy Controls")
+rp$ddkrate_rp.correct <- ifelse(rp$ddkrate_rp.preds == rp$part_grp,1,0)
+
+# Don't look at PBJ because it's not significant
+
+```
+
+We find that the coefficient of variation in speech rate predicts CHR vs. HC status with `r myround(mean(ddk$ddkrate_amr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-AMR subtask, `r myround(mean(ddk$ddkrate_smr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-SMR subtask, and `r myround(mean(rp$ddkrate_rp.correct, na.rm = TRUE)*100)`\% accuracy in the read subtask (with a 50\% probability cut-off in the logistic regression). We present the full ROC curve (with sensitivity and specificity values) in Figure S\ref{fig:ddkrate-roc-plot}. Again, the fact that the categorization is above chance is promising that speech measures could be helpful in identifying high-risk individuals, in conjunction with other complementary measures.
+
+```{r, roc-curves-ddkrate, fig.cap = "\\label{fig:ddkrate-roc-plot}Specificity/sensitivity trade-off for categorization model predicting CHR vs. HC status from the coefficient of variation of speech rate."}
+
+# Prepare DDK ROC curve
+roc_ddkrate_amr <- roc(subset(ddk, subtask == 'amr')$part_grp, subset(ddk, subtask == 'amr')$ddkrate_amr.probs)
+roc_ddkrate_smr <- roc(subset(ddk, subtask == 'smr')$part_grp, subset(ddk, subtask == 'smr')$ddkrate_smr.probs)
+roc_ddkrate_rp <- roc(rp$part_grp, rp$ddkrate_rp.probs)
+
+roc_list <- list()
+roc_list[[paste0("Diadochokinetic AMR (AUC=", myround(as.numeric(roc_ddkrate_amr$auc)),")")]] <- roc_ddkrate_amr
+roc_list[[paste0("Diadochokinetic SMR (AUC=", myround(as.numeric(roc_ddkrate_smr$auc)),")")]] <- roc_ddkrate_smr
+roc_list[[paste0("Read Speech (AUC=", myround(as.numeric(roc_ddkrate_rp$auc)),")")]] <- roc_ddkrate_rp
+
+roc_ddkrate <- ggroc(roc_list) + geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color = "grey", linetype = "dashed") + ggtitle("ROC Curve for Speech Rate") + theme(legend.title=element_blank()) + xlab("Specificity") + ylab("Sensitivity")
+roc_ddkrate
+
+```
+
+
+### Combining speech and other measures
+
+```{r, speech-finger-big-categorization-model}
+
+# AMR
+ddk$part_grp <- relevel(factor(ddk$part_grp), ref = "Healthy Controls")
+bigcat_amr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate + log_coeffvar_vot_duration + log(avg_ddk_rate) + log_FingerTapping_SCTAP_DomCV, data = subset(ddk, subtask == 'amr' & !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+ddk$bigcat_amr.probs[ddk$subtask == 'amr'] <- bigcat_amr.stats %>% predict(subset(ddk, subtask == 'amr'), type = "response")
+ddk$bigcat_amr.preds[ddk$subtask == 'amr'] <- ifelse(ddk$bigcat_amr.probs[ddk$subtask == 'amr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$bigcat_amr.correct[ddk$subtask == 'amr'] <- ifelse(ddk$bigcat_amr.preds[ddk$subtask == 'amr'] == ddk$part_grp[ddk$subtask == 'amr'],1,0)
+
+#SMR
+bigcat_smr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate + log_coeffvar_vot_duration + log(avg_ddk_rate) + log_FingerTapping_SCTAP_DomCV, data = subset(ddk, subtask == 'smr' & !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+ddk$bigcat_smr.probs[ddk$subtask == 'smr'] <- bigcat_smr.stats %>% predict(subset(ddk, subtask == 'smr'), type = "response")
+ddk$bigcat_smr.preds[ddk$subtask == 'smr'] <- ifelse(ddk$bigcat_smr.probs[ddk$subtask == 'smr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$bigcat_smr.correct[ddk$subtask == 'smr'] <- ifelse(ddk$bigcat_smr.preds[ddk$subtask == 'smr'] == ddk$part_grp[ddk$subtask == 'smr'],1,0)
+
+# RP
+bigcat_rp.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate + log_coeffvar_vot_voiceless_duration + log(avg_local_speech_rate) + log_FingerTapping_SCTAP_DomCV, data = subset(rp, !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+rp$bigcat_rp.probs <- bigcat_rp.stats %>% predict(rp, type = "response")
+rp$bigcat_rp.preds <- ifelse(rp$bigcat_rp.probs > 0.50, "Clinical High-Risk", "Healthy Controls")
+rp$bigcat_rp.correct <- ifelse(rp$bigcat_rp.preds == rp$part_grp,1,0)
+
+```
+
+```{r, fingertapping-categorization-model}
+
+# AMR
+ft_amr.stats <- glm(part_grp ~ log_FingerTapping_SCTAP_DomCV, data = subset(ddk, subtask == 'amr' & !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+ddk$ft_amr.probs[ddk$subtask == 'amr'] <- ft_amr.stats %>% predict(subset(ddk, subtask == 'amr'), type = "response")
+ddk$ft_amr.preds[ddk$subtask == 'amr'] <- ifelse(ddk$ft_amr.probs[ddk$subtask == 'amr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$ft_amr.correct[ddk$subtask == 'amr'] <- ifelse(ddk$ft_amr.preds[ddk$subtask == 'amr'] == ddk$part_grp[ddk$subtask == 'amr'],1,0)
+
+#SMR
+ft_smr.stats <- glm(part_grp ~ log_FingerTapping_SCTAP_DomCV, data = subset(ddk, subtask == 'smr' & !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+ddk$ft_smr.probs[ddk$subtask == 'smr'] <- ft_smr.stats %>% predict(subset(ddk, subtask == 'smr'), type = "response")
+ddk$ft_smr.preds[ddk$subtask == 'smr'] <- ifelse(ddk$ft_smr.probs[ddk$subtask == 'smr'] > 0.50, "Clinical High-Risk", "Healthy Controls")
+ddk$ft_smr.correct[ddk$subtask == 'smr'] <- ifelse(ddk$ft_smr.preds[ddk$subtask == 'smr'] == ddk$part_grp[ddk$subtask == 'smr'],1,0)
+
+# RP
+ft_rp.stats <- glm(part_grp ~ log_FingerTapping_SCTAP_DomCV, data = subset(rp, !is.na(FingerTapping_SCTAP_DomCV)), family = 'binomial')
+rp$ft_rp.probs <- ft_rp.stats %>% predict(rp, type = "response")
+rp$ft_rp.preds <- ifelse(rp$ft_rp.probs > 0.50, "Clinical High-Risk", "Healthy Controls")
+rp$ft_rp.correct <- ifelse(rp$ft_rp.preds == rp$part_grp,1,0)
+
+```
+
+Finally, we test how combining speech measures with other motor measures does at categorizing group status. Specifically, we fit a logistic regression model that predicts CHR vs. HC status from a combination of the speech measures that were found to significantly differ by group (voiceless voice-onset-times and speech rate coefficients of variation) and finger-tapping coefficients of variation (dominant hand). We find that this combination of speech and non-speech motor measures predicts group status with `r myround(mean(ddk$bigcat_amr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-AMR subtask, `r myround(mean(ddk$bigcat_smr.correct, na.rm = TRUE)*100)`\% accuracy in the Diadochokinetic-SMR subtask, and `r myround(mean(rp$bigcat_rp.correct, na.rm = TRUE)*100)`\% accuracy in the read speech task (see Figure S\ref{fig:bigcat-roc-plot} for the ROC curve). With the exception of the Diadochokinetic-SMR subtask, this improves over a model that simply uses non-speech motor measures (i.e., finger-tapping coefficients of variation) to predict CHR vs. HC status, which achieves `r myround(mean(ddk$ft_amr.correct, na.rm = TRUE)*100)`\% accuracy on the Diadochokinetic-AMR subtask, `r myround(mean(ddk$ft_smr.correct, na.rm = TRUE)*100)`\% accuracy on the Diadochokinetic-SMR subtask, and `r myround(mean(rp$ft_rp.correct, na.rm = TRUE)*100)`\% accuracy on the read speech task. Overall, this suggests that, when combined with other clinical and motor measures, speech measures has diagnostic value and this should be further studied in the future.
+
+
+```{r, roc-curves-bigcat, fig.cap = "\\label{fig:bigcat-roc-plot}Specificity/sensitivity trade-off for categorization model predicting CHR vs. HC status from both speech measures and non-speech motor measures (finger-tapping coefficient of variation in the dominant hand)."}
+
+# Prepare DDK ROC curve
+roc_bigcat_amr <- roc(subset(ddk, subtask == 'amr')$part_grp, subset(ddk, subtask == 'amr')$bigcat_amr.probs)
+roc_bigcat_smr <- roc(subset(ddk, subtask == 'smr')$part_grp, subset(ddk, subtask == 'smr')$bigcat_smr.probs)
+roc_bigcat_rp <- roc(rp$part_grp, rp$bigcat_rp.probs)
+
+roc_list <- list()
+roc_list[[paste0("Diadochokinetic AMR (AUC=", myround(as.numeric(roc_bigcat_amr$auc)),")")]] <- roc_bigcat_amr
+roc_list[[paste0("Diadochokinetic SMR (AUC=", myround(as.numeric(roc_bigcat_smr$auc)),")")]] <- roc_bigcat_smr
+roc_list[[paste0("Read Speech (AUC=", myround(as.numeric(roc_bigcat_rp$auc)),")")]] <- roc_bigcat_rp
+
+roc_bigcat <- ggroc(roc_list) + geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color = "grey", linetype = "dashed") + ggtitle("ROC Curve (Speech + Finger-Tapping Measures)") + xlab("Specificity") + ylab("Sensitivity") + theme(legend.title=element_blank())
+roc_bigcat
+
+```
+
+
 ## Results comparing the in-person and remote subgroups
 
 ```{r,inp-vs-rem-stats}
 
-vot_amr_inp.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr' & Test.Type == "InPerson"), family = 'binomial')
-vot_amr_rem.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr' & Test.Type == "Remote"), family = 'binomial')
+vot_amr_inp.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr' & Test.Type == "InPerson"), family = 'binomial')
+vot_amr_rem.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr' & Test.Type == "Remote"), family = 'binomial')
 
-ddkrate_amr_inp.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'amr' & Test.Type == "InPerson"), family = 'binomial')
-ddkrate_amr_rem.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'amr' & Test.Type == "Remote"), family = 'binomial')
+ddkrate_amr_inp.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'amr' & Test.Type == "InPerson"))
+ddkrate_amr_rem.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'amr' & Test.Type == "Remote"))
 
-vot_smr_inp.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr' & Test.Type == "InPerson"), family = 'binomial')
-vot_smr_rem.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr' & Test.Type == "Remote"), family = 'binomial')
+vot_smr_inp.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr' & Test.Type == "InPerson"))
+vot_smr_rem.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr' & Test.Type == "Remote"))
 
-ddkrate_smr_inp.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'smr' & Test.Type == "InPerson"), family = 'binomial')
-ddkrate_smr_rem.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'smr' & Test.Type == "Remote"), family = 'binomial')
+ddkrate_smr_inp.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'smr' & Test.Type == "InPerson"))
+ddkrate_smr_rem.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'smr' & Test.Type == "Remote"))
 
-vot_rp_inp.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, Test.Type == 'InPerson'), family = 'binomial')
-vot_rp_rem.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, Test.Type == 'Remote'), family = 'binomial')
+vot_rp_inp.stats <- lm(log_coeffvar_vot_voiceless_duration ~ part_grp + log_avg_local_speech_rate, data = subset(rp, Test.Type == 'InPerson'))
+vot_rp_rem.stats <- lm(log_coeffvar_vot_voiceless_duration ~ part_grp + log_avg_local_speech_rate, data = subset(rp, Test.Type == 'Remote'))
 
-ddkrate_rp_inp.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = subset(rp, Test.Type == 'InPerson'), family = 'binomial')
-ddkrate_rp_rem.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = subset(rp, Test.Type == 'Remote'), family = 'binomial')
+ddkrate_rp_inp.stats <- lm(log_coeffvar_local_speech_rate ~ part_grp, data = subset(rp, Test.Type == 'InPerson'))
+ddkrate_rp_rem.stats <- lm(log_coeffvar_local_speech_rate ~ part_grp, data = subset(rp, Test.Type == 'Remote'))
 
 ```
 
-Due to space constraints, the main text only presented some of the graphs comparing the subset of participants tested in-person prior to the pandemic and the subset of participants tested remotely during the pandemic. Here, we present the full set of results, in which we often observe quite large CHR vs. HC group differences in the In-Person subgroup and less stark group differences in the Remote subgroup. For each of the two speech measures that showed significant group differences overall, we tested whether they also showed significant group differences within both the in-person and remote subsets across the three tasks that showed significant group effects (i.e., Diadochokinetic-AMR, Diadochokinetic-SMR, and Read speech tasks).
+Due to space constraints, the main text only presented some of the graphs comparing the subset of participants tested in-person prior to the pandemic and the subset of participants tested remotely during the pandemic. Here, we present the full set of results, in which we often observe quite large CHR vs. HC group differences in the In-Person subgroup and **reduced** group differences in the Remote subgroup. For each of the two speech measures that showed significant group differences overall, we tested whether they also showed significant group differences within both the in-person and remote subsets across the three tasks that showed significant group effects (i.e., Diadochokinetic-AMR, Diadochokinetic-SMR, and Read speech tasks).
 
 For variability in voiceless voice-onset-time (Figure S\ref{fig:inp-vs-rem-vot-plots}), we observe significant CHR vs. HC group differences in the in-person subgroup (Diadochokinetic-AMR: `r grpdiff_output(vot_amr_inp.stats, 'log_coeffvar_vot_duration')`; Diadochokinetic-SMR: `r grpdiff_output(vot_smr_inp.stats, 'log_coeffvar_vot_duration')`; Read: `r grpdiff_output(vot_rp_inp.stats, 'log_coeffvar_vot_voiceless_duration')`), but not the remote subgroup (Diadochokinetic-AMR: `r grpdiff_output(vot_amr_rem.stats, 'log_coeffvar_vot_duration')`; Diadochokinetic-SMR: `r grpdiff_output(vot_smr_rem.stats, 'log_coeffvar_vot_duration')`; Read: `r grpdiff_output(vot_rp_rem.stats, 'log_coeffvar_vot_voiceless_duration')`), though we note that the in-person and remote subgroups show similar qualitative patterns in the Read Speech task. 
 
@@ -641,7 +1174,7 @@ ddkrate_inp_rem
 
 ## Analyses studying the relationship between speech measures and demographics
 
-Past work has found that some measures intended to measure speech/language differences actually tapped into sociodemographic factors. We tested whether this explained the group differences in speech variability, by studying the relationship between the speech measures and all sociodemographic factors reported in Table 1 (age, sex, race, ethnicity (Hispanic vs. not), and first language), within the Diadochokinetic-AMR, SMR, and Read speech tasks (i.e., those that showed significant group differences). To do so, for each sociodemographic factor, for each subtask, for each speech measure, we fit a linear regression model predicting the speech measure from two predictors: the sociodemographic factor and group (CHR vs HC), without interactions. When studying variability in voiceless stop production, we additionally included a third predictor, average speech rate, as a control. Our results suggest that sociodemographics cannot explain the group differences in speech measure variability observed in the main paper.
+Past work has found that some measures intended to measure speech/language differences actually tapped into sociodemographic factors. We tested whether this explained the group differences in speech variability, by studying the relationship between the speech measures and all sociodemographic factors reported in Table 3 of the main text (age, sex, race, ethnicity (Hispanic vs. not), and first language), within the Diadochokinetic-AMR, SMR, and Read speech tasks (i.e., those that showed significant group differences). To do so, for each sociodemographic factor, for each subtask, for each speech measure, we fit a linear regression model predicting the speech measure from two predictors: the sociodemographic factor and group (CHR vs HC), without interactions. When studying variability in voiceless stop production, we additionally included a third predictor, average speech rate, as a control. Our results suggest that sociodemographics cannot explain the group differences in speech measure variability observed in the main paper.
 
 ### Age
 
@@ -788,7 +1321,7 @@ ddkrate_race_ba_rp.stats <- lm(log_coeffvar_local_speech_rate ~ Demo_Race + part
 
 ```
 
-To study the potential role of racial identity, we focused our analyses on pairwise comparisons between (i) individuals who self-identified as Black, (ii) individuals who self-identified as Asian, and (iii) individuals who self-identified as white. This was done to ensure sufficiently-sized comparison groups (see Table 1 in main text). Even with this decision, our conclusions are still limited by sample size (e.g., some N's near 10), and future work should follow-up on this question using large enough samples that allow for fully-powered, and more nuanced, analyses. 
+To study the potential role of racial identity, we focused our analyses on pairwise comparisons between (i) individuals who self-identified as Black, (ii) individuals who self-identified as Asian, and (iii) individuals who self-identified as white. This was done to ensure sufficiently-sized comparison groups. Even with this decision, our conclusions are still limited by sample size (e.g., some N's near 10), and future work should follow-up on this question using large enough samples that allow for fully-powered, and more nuanced, analyses. 
 
 Results are visually presented in Figure S\ref{fig:race-plot}. Across all three tasks and all pairwise comparisons, we find no relationship between racial identity and variability in speech measures. In particular, within the pairwise comparison of Asian and white participants, we find no relationship between racial identity and either variability in voiceless voice-onset-times (AMR: `r corr_output(vot_race_aw_amr.stats, "Demo_RaceAsian")`, SMR: `r corr_output(vot_race_aw_smr.stats, "Demo_RaceAsian")`, Read: `r corr_output(vot_race_aw_rp.stats, "Demo_RaceAsian")`) or variability in speech rate (AMR: `r corr_output(ddkrate_race_aw_amr.stats, "Demo_RaceAsian")`, SMR: `r corr_output(ddkrate_race_aw_smr.stats, "Demo_RaceAsian")`, Read: `r corr_output(ddkrate_race_aw_rp.stats, "Demo_RaceAsian")`).
 
@@ -894,7 +1427,7 @@ ddkrate_l1_rp.stats <- lm(log_coeffvar_local_speech_rate ~ Demo_L1 + part_grp, d
 
 ```
 
-We found no relationship between language status (participants who reported English to be their first language vs. participants who did not) and variability in speech measures (Figure S\{fig:l1-plot}). In particular, first language status did not relate to either variability in voiceless stop production (Diadochokinetic-AMR: `r corr_output(vot_l1_amr.stats, "Demo_L12")`; Diadochokinetic-SMR: `r corr_output(vot_l1_smr.stats, "Demo_L12")`; Read: `r corr_output(vot_l1_rp.stats, "Demo_L12")`) or variability in speech rate (Diadochokinetic-AMR: `r corr_output(ddkrate_l1_amr.stats, "Demo_L12")`; Diadochokinetic-SMR: `r corr_output(ddkrate_l1_smr.stats, "Demo_L12")`; Read: `r corr_output(ddkrate_l1_rp.stats, "Demo_L12")`).
+We found no relationship between language status (participants who reported English to be their first language vs. participants who did not) and variability in speech measures (Figure S\ref{fig:l1-plot}). In particular, first language status did not relate to either variability in voiceless stop production (Diadochokinetic-AMR: `r corr_output(vot_l1_amr.stats, "Demo_L12")`; Diadochokinetic-SMR: `r corr_output(vot_l1_smr.stats, "Demo_L12")`; Read: `r corr_output(vot_l1_rp.stats, "Demo_L12")`) or variability in speech rate (Diadochokinetic-AMR: `r corr_output(ddkrate_l1_amr.stats, "Demo_L12")`; Diadochokinetic-SMR: `r corr_output(ddkrate_l1_smr.stats, "Demo_L12")`; Read: `r corr_output(ddkrate_l1_rp.stats, "Demo_L12")`).
 
 
 ```{r, l1-individual-plots}
@@ -1000,7 +1533,7 @@ We reconducted our main analyses with two CHR participants removed: one was late
 
 ### Clinical High-Risk vs. Healthy Control group differences
 
-We found qualitatively similar, though statistically different, group difference results to those reported in the main text. We found that the coefficient of variation of voiceless consonants significantly predicted CHR vs HC in the Diadochokinetic SMR ("pataka"/"katapa") speech samples, but was just above the significance threshold in the Diadochokinetic AMR ("papapa"/"tataka"/"kakaka") and Read speech samples. We found that the coefficient of variation of speech rate still significantly predicted group status (CHR vs. HC) in the Diadochokinetic AMR and Diadochokinetic SMR speech samples, but was just above the significance threshold in the Read speech samples. Finally, we additionally found that the coefficient of variation in intersyllable duration significantly predicted CHR vs HC in the Diadochokinetic SMR speech samples, but not the Diadochokinetic SMR speech samples. Because of the large number of graphs and their similarity to those reported in the main text, we just provide details on the statistical analyses in Table S1.
+We found qualitatively similar, though statistically different, group difference results to those reported in the main text. We found that the coefficient of variation of voiceless consonants significantly predicted CHR vs HC in the Diadochokinetic SMR ("pataka"/"katapa") speech samples, but was just above the significance threshold in the Diadochokinetic AMR ("papapa"/"tataka"/"kakaka") and Read speech samples. We found that the coefficient of variation of speech rate still significantly predicted group status (CHR vs. HC) in the Diadochokinetic AMR and Diadochokinetic SMR speech samples, but was just above the significance threshold in the Read speech samples. Finally, we additionally found that the coefficient of variation in intersyllable duration significantly predicted CHR vs HC in the Diadochokinetic SMR speech samples, but not the Diadochokinetic SMR speech samples. Because of the large number of graphs and their similarity to those reported in the main text, we just provide details on the statistical analyses in Table S2.
 
 ```{r, read-in-data-with-participants-removed}
 
@@ -1069,9 +1602,6 @@ pauses_pbj.stats <- glm(part_grp ~ log_n_pauses_per_word, data = pbj, family = '
 
 ```{r, parts-removed-grpdiffs-table}
 
-library(flextable)
-library(officer)
-
 gd <- data.frame(Measure = c("Consonant Production Measures"), 
                  Subtask = c("Consonant Production Measures"), 
                  Beta = c("Consonant Production Measures"),
@@ -1133,7 +1663,7 @@ gd_tab <- align(gd_tab, i=c(1,10,15,32), align = "center", part = "body")
 gd_tab <- bold(gd_tab, i=sig, j=-c(1), bold = TRUE)
 gd_tab <- italic(gd_tab, i=trend, j=-c(1), italic = TRUE)
 gd_tab <- width(gd_tab, j = 1, 2.2, unit = "cm")
-gd_tab <- set_caption(gd_tab, caption = "Summary of Clinical High-Risk vs. Healthy Control group difference analysis outcomes with two CHR participants excluded. Bold denotes a significant difference; italics denotes a trend.")
+gd_tab <- set_caption(gd_tab, caption = "Summary of Clinical High-Risk vs. Healthy Control group difference analysis outcomes with two clinical-high-risk participants excluded. Bold denotes a significant difference (p<0.05); italics denotes a trending difference (p<0.10).")
 gd_tab
 
 ```
@@ -1142,7 +1672,7 @@ gd_tab
 
 As in the main text, we then tested whether these two speech measures were related to symptom severity, non-speech motor measures, as well as risk of conversion variables, as measures of clinical, convergent, and predictive validity. Given that we reported results for Read speech in the main text and its group difference results were just above the significance threshold with the two participants removed, we also report correlation results for Read Speech here.
 
-The consonant results (coefficient of variation of voiceless VOTs) were qualitatively similar to those reported in the main text (Table S2): we found no significant relationships between the speech measure and any of the clinical/motor/risk variables examined in any of the speech samples, with the exception of one significant positive correlation between variability in consonant duration and SIPS-RC risk of conversion scores in the Diadochokinetic-AMR subtask only. The speech rate results were identical to those reported in the main text (Table S3). In particular, as in the main text, we still observed a significant positive relationship between variation in speech rate and variation in finger tapping in the non-dominant hand in the read speech samples. We observed no other significant correlations between the speech measure and clinical/motor/risk variables. Overall, as in the main text, we generally failed to find evidence of clinical, convergent, and predictive validity of the studied speech measures.
+The consonant results (coefficient of variation of voiceless VOTs) were qualitatively similar to those reported in the main text (Table S3): we found no significant relationships between the speech measure and any of the clinical/motor/risk variables examined in any of the speech samples, with the exception of one significant positive correlation between variability in consonant duration and SIPS-RC risk of conversion scores in the Diadochokinetic-AMR subtask only. The speech rate results were identical to those reported in the main text (Table S4). In particular, as in the main text, we still observed a significant positive relationship between variation in speech rate and variation in finger tapping in the non-dominant hand in the read speech samples. We observed no other significant correlations between the speech measure and clinical/motor/risk variables. Overall, as in the main text, we generally failed to find evidence of clinical, convergent, and predictive validity of the studied speech measures.
 
 ```{r, parts-removed-vot-corr-stats}
 
