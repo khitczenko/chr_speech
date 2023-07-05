@@ -43,11 +43,11 @@ affiliation:
 
 abstract: |
 
-  Background and Hypothesis: Motor abnormalities are predictive of psychosis onset in individuals at clinical high risk (CHR) for psychosis and are tied to its progression. We hypothesize that these motor abnormalities also disrupt their speech production (a highly complex motor behavior) and predict CHR individuals will produce more variable speech pronunciations than healthy controls, and that this variability will relate to symptom severity, motor measures, and psychosis-risk calculator risk scores.
+  Background and Hypothesis: Motor abnormalities are predictive of psychosis onset in individuals at clinical high risk (CHR) for psychosis and are tied to its progression. We hypothesize that these motor abnormalities also disrupt their speech production (a highly complex motor behavior) and predict CHR individuals will produce more variable speech than healthy controls, and that this variability will relate to symptom severity, motor measures, and psychosis-risk calculator risk scores.
 
-  Study Design: We measure variability in speech production (variability in consonants, vowels, speech rate, and pausing/timing) in N=58 CHR participants and N=67 healthy controls. Three different tasks are used to elicit speech: diadochokinetic speech (rapidly repeat syllables e.g., papapa…, pataka…), read speech, and spontaneously-generated speech. 
+  Study Design: We measure variability in speech production (variability in consonants, vowels, speech rate, and pausing/timing) in N=58 CHR participants and N=67 healthy controls. Three different tasks are used to elicit speech: diadochokinetic speech (rapidly-repeated syllables e.g., papapa…, pataka…), read speech, and spontaneously-generated speech. 
   
-  Study Results: Individuals in the CHR group  produced more variable consonants and exhibited greater speech rate variability than healthy controls in two of the three speech tasks (diadochokinetic and read speech). While there were no significant correlations between speech measures and remotely-obtained motor measures, symptom severity, or conversion risk scores, these comparisons may be under-powered (in part due to challenges of remote data collection during the COVID-19 pandemic).
+  Study Results: Individuals in the CHR group produced more variable consonants and exhibited greater speech rate variability than healthy controls in two of the three speech tasks (diadochokinetic and read speech). While there were no significant correlations between speech measures and remotely-obtained motor measures, symptom severity, or conversion risk scores, these comparisons may be under-powered (in part due to challenges of remote data collection during the COVID-19 pandemic).
   
   Conclusion: This study provides a thorough and theory-driven first look at how speech production is affected in this at-risk population and speaks to the promise and challenges facing this approach moving forward.
   
@@ -75,6 +75,10 @@ library("dplyr")
 library("ggplot2")
 library("ggpubr")
 library("stringr")
+library("flextable")
+library("officer")
+library("sjmisc")
+library("tibble")
 r_refs("speech-in-chr-references.bib")
 ```
 
@@ -90,10 +94,10 @@ mypval<-function(p) if(p < .001) "< .001" else paste("=", round(p,3))
 myround <-function(val) round(val,2)
 
 grpdiff_output <- function(test,var) {
-  out <- paste0("$\\beta$ = ", myround(summary(test)$coefficients[var, "Estimate"]),
-                ", s.e. = ", myround(summary(test)$coefficients[var, "Std. Error"]),
-                ", z = ", myround(summary(test)$coefficients[var, "z value"]),
-                ", p ", mypval(summary(test)$coefficients[var, "Pr(>|z|)"]))
+  out <- paste0("$\\beta$ = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "Estimate"]),
+                ", s.e. = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "Std. Error"]),
+                ", t = ", myround(summary(test)$coefficients["part_grpClinical High-Risk", "t value"]),
+                ", p ", mypval(summary(test)$coefficients["part_grpClinical High-Risk", "Pr(>|t|)"]))
   return(out)
 }
 
@@ -105,8 +109,16 @@ corr_output <- function(test,var) {
   return(out)
 }
 
+corr_output_table <- function(test,var) {
+  f <- summary(test)$fstatistic
+  p <- pf(f[1],f[2],f[3],lower.tail=F)
+  out <- paste0("r = ", myround(sqrt(summary(test)$r.squared)),
+                "\n","(p = ", myround(p), ")")
+  return(out)
+}
+
 get_grpdiff_p <- function(test,var) {
-  out <- myround(summary(test)$coefficients[var, "Pr(>|z|)"])
+  out <- myround(summary(test)$coefficients["part_grpClinical High-Risk", "Pr(>|t|)"])
   return(out)
 }
 
@@ -122,11 +134,11 @@ extract_number <- function(str) {
 
 Individuals with psychosis exhibit motor abnormalities (e.g., tremors, rigidity, dyskinesia, soft-signs) and recent work has suggested that these behaviors may also represent sensitive prognostic indicators during the prodromal period.[@cuesta_motor_2018; @van_harten_clinical_2017; @walther_motor_2012; @mittal_what_2017] In addition, motor signs can be objectively measured, in contrast to other symptom domains which are often subject to observer/rater bias.[@dean_handwriting_2013; @van_harten_clinical_2017] However, motor assessments frequently require significant expertise, as well as time-intensive analyses and/or cumbersome instrumentation.[@osborne_contingent_2020; @damme_detecting_2020; @dean_motion_2018; @bernard_cerebellar_2014; @van_harten_clinical_2017]  In this work, we explore one potential solution, examining the feasibility of using the physical properties of speech to measure motor abnormalities. Speech is a highly complex motor behavior, involving very fine-tuned movements that, when distorted in even subtle ways, can produce easily observable acoustic consequences (e.g., millimeter differences in placement/movement and millisecond differences in timing/coordination can substantially change the speech acoustics).[@kent_research_2000]
 
-Because basal ganglia and cerebellar circuits modulate motor function and are also implicated in leading models of psychosis[@andreasen_cognitive_1998; @howes_dopamine_2009, @northoff_all_2021], there is good reason to believe that motor signs may be an early and sensitive biomarker.[@mittal_what_2017] Indeed, of the identified early vulnerability markers seen in children that develop adult psychosis, motor abnormalities may be the most common.[@erlenmeyer-kimling_attention_2000] For example, a myriad of motor behavior domains have been demonstrated to predict infants/children that ultimately develop adult schizophrenia including: delays in achieving motor milestones[@filatova_early_2017], neuromotor deficits and involuntary movements[@kindler_abnormal_2016], and neurological soft signs.[@rosso_childhood_2000]  One study comparing childhood video tapes of schizophrenia patients with videos of their healthy siblings, found that the pre-schizophrenia children showed a higher rate of motor abnormalities and delays. In a similar study, Schiffman and colleagues[@schiffman_childhood_2009] examined video-taped social interactions of 11-13 year old children who later developed schizophrenia and observed that a high occurrence of movement abnormalities distinguished the pre-schizophrenia children from matched controls. In adolescence, neuromaturational factors and environmental stressors can exacerbate underlying vulnerabilities in the motor and dopamine system[@howes_molecular_2007], leading to other outward manifestations in this age group, including spontaneous dyskinesias (i.e., spontaneous jerking and irregular ballistic movements).[@mittal_relations_2007] Indeed, among high-risk groups (i.e., those showing a low level of symptoms) these particular motor behaviors increase in frequency and severity as a function of development and increased disease burden, are associated with increased attenuated positive symptoms[@mittal_movement_2007; @mittal_longitudinal_2008] and strongly predict conversion to psychosis.[@mittal_movement_2007-1; @mittal_markers_2010; @dean_motor_2018]  As not all at-risk individuals go on to develop a psychotic disorder, this is highly relevant.[@mittal_as_2019]  Irrespective of medication (i.e., the motor abnormalities are present in neuroleptic naïve samples), these spontaneous jerking movements in the head, face, lips, and torso can continue to emerge during the adolescent prodromal period, until onset, when they remain a key clinical feature of the illness.[@pappa_spontaneous_2009] At least one cross-sectional study suggests that with advanced age, all patients with schizophrenia will eventually develop these behaviors.[@quinn_vulnerability_2001]   
+Because basal ganglia and cerebellar circuits modulate motor function and are also implicated in leading models of psychosis[@andreasen_cognitive_1998; @howes_dopamine_2009, @northoff_all_2021], there is good reason to believe that motor signs may be an early and sensitive biomarker.[@mittal_what_2017] Indeed, of the identified early vulnerability markers seen in children that develop adult psychosis, motor abnormalities may be the most common.[@erlenmeyer-kimling_attention_2000] For example, a myriad of motor behavior domains have been demonstrated to predict infants/children that ultimately develop adult schizophrenia including: delays in achieving motor milestones[@filatova_early_2017], neuromotor deficits and involuntary movements[@kindler_abnormal_2016], and neurological soft signs.[@rosso_childhood_2000]  One study comparing childhood video tapes of schizophrenia patients with childhood videos of their healthy siblings as well as healthy community controls, found that the pre-schizophrenia children showed a higher rate of motor abnormalities and delays.[@walker_neuromotor_1994] In a similar study, Schiffman and colleagues[@schiffman_childhood_2009] examined video-taped social interactions of 11-13 year old children who later developed schizophrenia and observed that a high occurrence of movement abnormalities distinguished the pre-schizophrenia children from matched controls. In adolescence, neuromaturational factors and environmental stressors can exacerbate underlying vulnerabilities in the motor and dopamine system[@howes_molecular_2007], leading to other outward manifestations in this age group, including spontaneous dyskinesias (i.e., spontaneous jerking and irregular ballistic movements).[@mittal_relations_2007] Indeed, among high-risk groups (i.e., those showing a low level of symptoms) these particular motor behaviors increase in frequency and severity as a function of development and increased disease burden, are associated with increased attenuated positive symptoms[@mittal_movement_2007; @mittal_longitudinal_2008] and strongly predict conversion to psychosis.[@mittal_movement_2007-1; @mittal_markers_2010; @dean_motor_2018]  As not all at-risk individuals go on to develop a psychotic disorder, this is highly relevant.[@mittal_as_2019]  Irrespective of medication (i.e., the motor abnormalities are present in neuroleptic naïve samples), these spontaneous jerking movements in the head, face, lips, and torso can continue to emerge during the adolescent prodromal period, until onset, when they remain a key clinical feature of the illness.[@pappa_spontaneous_2009] At least one cross-sectional study suggests that with advanced age, all patients with schizophrenia will eventually develop these behaviors.[@quinn_vulnerability_2001] We point readers to recent review articles for more discussion of motor function in the prodromal syndrome.[@walther_why_2016; @mittal_movement_2009; @mittal_research_2017; @van_harten_clinical_2017; @pieters_systematic_2022; @mittal_as_2019; @moberget_prediction_2019]    
 
-Previous work has examined speech production in schizophrenia/psychosis.[@arevian_clinical_2020; @bernardini_associations_2016; @cohen_computerized_2008; @cohen_vocal_2016; @compton_aprosody_2018; @covington_phonetic_2012; @lozano-goupil_gesture-speech_2022; @martinez-sanchez_can_2015; @parola_voice_2020; @rapcan_acoustic_2010] This work has been promising, but results are mixed. A recent meta-analysis found three speech measures differentiated clinical and control groups, but only one (speech rate) was robust.[@parola_voice_2020] However, this prior work has generally not examined individuals at clinical high-risk (CHR), nor has it focused on motor abnormalities. It also has largely pursued a data-driven approach. Our work pursues a hypothesis-driven approach, studying acoustic measures that are predicted to be disrupted by motor abnormalities in speech produced by individuals at clinical-high-risk.
+Previous work has examined speech production in schizophrenia/psychosis.[@arevian_clinical_2020; @bernardini_associations_2016; @cohen_computerized_2008; @cohen_vocal_2016; @compton_aprosody_2018; @covington_phonetic_2012; @lozano-goupil_gesture-speech_2022; @martinez-sanchez_can_2015; @parola_voice_2020; @rapcan_acoustic_2010] This work has been promising, but results are mixed. A recent meta-analysis found three speech measures (speech rate, pause duration, and proportion spoken time) differentiated clinical and control groups (individuals with schizophrenia had slower speech rates, longer pauses, and lower speaking proportions), but only one (pause duration) showed a large effect.[@parola_voice_2020] In addition, the meta-analysis reported differences in results depending on the speech task used, generally finding that more cognitively or socially demanding tasks (e.g., free speech or dialogues) resulted in larger effects. However, this prior work has generally not examined individuals at clinical high-risk (CHR), nor has it focused on motor abnormalities. It also has largely pursued a data-driven approach. Our work pursues a hypothesis-driven approach, studying acoustic measures that are predicted to be disrupted by motor abnormalities in speech produced by individuals at clinical-high-risk.
 
-We hypothesize that disruptions to motor control will impact control over vocal articulators (e.g., tongue, lips), leading to more variable pronunciations in CHR participants when compared to healthy controls (HC), analogous to what has been observed in speech disorders.[@pascal_auzou_voice_2000; @goberman_acoustic_2002; @kent_toward_2003] Furthermore, if these speech measures reflect motor abnormalities, we would expect that increased variability in speech productions should relate to other measures of motor abnormalities (e.g., finger-tapping, as a test of convergent validity), worse symptom severity (as a test of clinical validity), and higher risk of conversion to psychosis (as a test of predictive validity). To systematically examine the conditions under which motor difficulties are observed, we elicit speech in highly-controlled samples that are specifically designed to measure motor difficulties (diadochokinetic speech), read speech, as well as more free-form, naturalistic speech which closely resembles everyday speech.
+We hypothesize that disruptions to motor control will impact control over vocal articulators (e.g., tongue, lips), leading to more variable speech in CHR participants when compared to healthy controls (HC), analogous to what has been observed in speech disorders.[@pascal_auzou_voice_2000; @goberman_acoustic_2002; @kent_toward_2003] Furthermore, if these speech measures reflect motor abnormalities, we would expect that increased variability in speech productions should relate to other measures of motor abnormalities (e.g., finger-tapping, as a test of convergent validity), worse symptom severity (as a test of clinical validity), and higher risk of conversion to psychosis (as a test of predictive validity). To systematically examine the conditions under which motor difficulties are observed, we elicit speech in highly-controlled samples that are specifically designed to measure motor difficulties (diadochokinetic speech), read speech, as well as more free-form, naturalistic speech which closely resembles everyday speech.
 
 # Results
 
@@ -146,19 +158,32 @@ demo <- merge(participant_list, clinical, by.x ='participant', by.y = 'Participa
 ```
 
 ```{r ddk-stats}
-ddk$part_grp <- factor(ddk$part_grp)
-vot_amr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-vot_smr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-ddkrate_amr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'amr'), family = 'binomial')
-ddkrate_smr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# ddk$part_grp <- factor(ddk$part_grp)
+# vot_amr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# vot_smr.stats <- glm(part_grp ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+# ddkrate_amr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'amr'), family = 'binomial')
+# ddkrate_smr.stats <- glm(part_grp ~ log_coeffvar_ddk_rate, data = subset(ddk, subtask == 'smr'), family = 'binomial')
+
+ddk$part_grp <- relevel(factor(ddk$part_grp), ref = "Healthy Controls")
+vot_amr.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+vot_smr.stats <- lm(log_coeffvar_vot_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+ddkrate_amr.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'amr'))
+ddkrate_smr.stats <- lm(log_coeffvar_ddk_rate ~ part_grp, data = subset(ddk, subtask == 'smr'))
+
 ```
 
 ```{r, read-stats}
 
 # Group differences
-rp$part_grp <- factor(rp$part_grp)
-vot_rp.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
-ddkrate_rp.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = rp, family = 'binomial')
+# rp$part_grp <- factor(rp$part_grp)
+# vot_rp.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
+# ddkrate_rp.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = rp, family = 'binomial')
+# Group differences
+
+# Group differences
+rp$part_grp <- relevel(factor(rp$part_grp), ref = "Healthy Controls")
+vot_rp.stats <- lm(log_coeffvar_vot_voiceless_duration ~ part_grp + log_avg_local_speech_rate, data = rp)
+ddkrate_rp.stats <- lm(log_coeffvar_local_speech_rate ~ part_grp, data = rp)
 
 # Correlations
 rp$log_FingerTapping_SCTAP_NonCV <- log(rp$FingerTapping_SCTAP_NonCV)
@@ -171,51 +196,54 @@ rp.lsr_domfingercv.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_loca
 ```
 
 ```{r spontaneous-stats}
-pbj$part_grp <- factor(pbj$part_grp)
-vot_pbj.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = pbj, family = 'binomial')
-ddkrate_pbj.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = pbj, family = 'binomial')
+# pbj$part_grp <- factor(pbj$part_grp)
+# vot_pbj.stats <- glm(part_grp ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = pbj, family = 'binomial')
+# ddkrate_pbj.stats <- glm(part_grp ~ log_coeffvar_local_speech_rate, data = pbj, family = 'binomial')
+
+pbj$part_grp <- relevel(factor(pbj$part_grp), ref = "Healthy Controls")
+vot_pbj.stats <- lm(log_coeffvar_vot_voiceless_duration ~ part_grp + log_avg_local_speech_rate, data = pbj)
+ddkrate_pbj.stats <- lm(log_coeffvar_local_speech_rate ~ part_grp, data = pbj)
+
+
 ```
 
 ```{r, additional-stats-for-table}
 
 # DDK
-voweldur_amr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldur_smr.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-voweldisp_amr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldisp_smr.stats <- glm(part_grp ~ log(formant_dispersion.20), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-voweldispdelta_amr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'amr'), family = 'binomial')
-voweldispdelta_smr.stats <- glm(part_grp ~ formant_delta_var, data = subset(ddk, subtask == 'smr'), family = 'binomial')
-sylldur_amr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-sylldur_smr.stats <- glm(part_grp ~ log(coeffvar_syll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
-intersylldur_amr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'), family = 'binomial')
-intersylldur_smr.stats <- glm(part_grp ~ log(coeffvar_intersyll_duration) + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'), family = 'binomial')
+voweldur_amr.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+voweldur_smr.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+voweldisp_amr.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = subset(ddk, subtask == 'amr'))
+voweldisp_smr.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = subset(ddk, subtask == 'smr'))
+voweldispdelta_amr.stats <- lm(formant_delta_var ~ part_grp, data = subset(ddk, subtask == 'amr'))
+voweldispdelta_smr.stats <- lm(formant_delta_var ~ part_grp, data = subset(ddk, subtask == 'smr'))
+sylldur_amr.stats <- lm(log(coeffvar_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+sylldur_smr.stats <- lm(log(coeffvar_syll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
+intersylldur_amr.stats <- lm(log(coeffvar_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'amr'))
+intersylldur_smr.stats <- lm(log(coeffvar_intersyll_duration) ~ part_grp + log(avg_ddk_rate), data = subset(ddk, subtask == 'smr'))
 
 # RP
-voiced_vot_rp.stats <- glm(part_grp ~ log_coeffvar_vot_voiced_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
-voweldur_rp.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log_avg_local_speech_rate, data = rp, family = 'binomial')
-voweldisp_rp.stats <- glm(part_grp ~ log(formant_dispersion.20), data = rp, family = 'binomial')
-voweldispdelta_rp.stats <- glm(part_grp ~ formant_delta_var, data = rp, family = 'binomial')
-vowelphoncomp_rp.stats <- glm(part_grp ~ log_formant_phonetic_competition, data = rp, family = 'binomial')
-pauses_rp.stats <- glm(part_grp ~ log_n_pauses_per_word, data = rp, family = 'binomial')
+voiced_vot_rp.stats <- lm(log_coeffvar_vot_voiced_duration ~ part_grp + log_avg_local_speech_rate, data = rp)
+voweldur_rp.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log_avg_local_speech_rate, data = rp)
+voweldisp_rp.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = rp)
+voweldispdelta_rp.stats <- lm(formant_delta_var ~ part_grp, data = rp)
+vowelphoncomp_rp.stats <- lm(log_formant_phonetic_competition ~ part_grp, data = rp)
+pauses_rp.stats <- lm(log_n_pauses_per_word ~ part_grp, data = rp)
 
 # PBJ
-voiced_vot_pbj.stats <- glm(part_grp ~ log_coeffvar_vot_voiced_duration + log_avg_local_speech_rate, data = subset(pbj, !is.infinite(log_coeffvar_vot_voiced_duration)), family = 'binomial')
-voweldur_pbj.stats <- glm(part_grp ~ log_coeffvar_vowel_duration + log_avg_local_speech_rate, data = pbj, family = 'binomial')
-voweldisp_pbj.stats <- glm(part_grp ~ log(formant_dispersion.20), data = pbj, family = 'binomial')
-voweldispdelta_pbj.stats <- glm(part_grp ~ formant_delta_var, data = pbj, family = 'binomial')
-vowelphoncomp_pbj.stats <- glm(part_grp ~ log_formant_phonetic_competition, data = subset(pbj, !is.na(log_formant_phonetic_competition)), family = 'binomial')
-pauses_pbj.stats <- glm(part_grp ~ log_n_pauses_per_word, data = pbj, family = 'binomial')
+voiced_vot_pbj.stats <- lm(log_coeffvar_vot_voiced_duration ~ part_grp + log_avg_local_speech_rate, data = subset(pbj, !is.infinite(log_coeffvar_vot_voiced_duration)))
+voweldur_pbj.stats <- lm(log_coeffvar_vowel_duration ~ part_grp + log_avg_local_speech_rate, data = pbj)
+voweldisp_pbj.stats <- lm(log(formant_dispersion.20) ~ part_grp, data = pbj)
+voweldispdelta_pbj.stats <- lm(formant_delta_var ~ part_grp, data = pbj)
+vowelphoncomp_pbj.stats <- lm(log_formant_phonetic_competition ~ part_grp, data = subset(pbj, !is.na(log_formant_phonetic_competition)))
+pauses_pbj.stats <- lm(log_n_pauses_per_word ~ part_grp, data = pbj)
 
 ```
 
-We present results by speech task. We focused on acoustic speech measures that have been extremely well-studied and can be reliably measured automatically (which allows us to study greater quantities of speech). The main text focuses on (i) variability in the audible duration (voice-onset-time) of voiceless (in English: p,t,k) and voiced (in English, b,d,g) stop consonants, (ii) variability in vowel durations, and (iii) variability in speech rates. We discuss the remaining speech measures we studied (including variability in vowel formants and variability in pausing/timing)[@sichlinger_clinical_2019; @stanislawski_negative_2021; @hillenbrand_acoustic_1995; @mccloy_talker_2015; @xie_lifg_2018; @niziolek_assessing_2018] in Table \@ref(tab:speech-measures-table) and SM-1.3.
+We present results by speech task. We focused on acoustic speech measures that have been extremely well-studied and can be reliably measured automatically (which allows us to study greater quantities of speech). The main text focuses on (i) variability in the voice-onset-time of voiceless (in English: p,t,k) and voiced (in English, b,d,g) stop consonants, i.e., the primary acoustic measure of stop consonants, defined as the duration between the release of the consonant and the onset of the following vowel, (ii) variability in vowel durations, and (iii) variability in speech rates. We discuss the remaining speech measures we studied (including variability in vowel formants and variability in pausing/timing)[@sichlinger_clinical_2019; @stanislawski_negative_2021; @hillenbrand_acoustic_1995; @mccloy_talker_2015; @xie_lifg_2018; @niziolek_assessing_2018] in Table \@ref(tab:descriptive-measures-table) and Supplementary Materials 1.3.
 
-N.B.: One CHR participant was identified as in-remission and another participant had a 7-months’ gap between their clinical interview and speech tasks. SM-2.7 includes analyses without these two participants; the results are qualitatively similar to the analyses of the full dataset reported below.
+N.B.: One CHR participant was identified as clinical high-risk in-remission and another participant had a 7-months’ gap between their clinical interview and speech tasks. Supplementary Materials 2.10 includes analyses without these two participants; the results are qualitatively similar to the analyses of the full dataset reported below.
 
-```{r, speech-measures-table}
-
-library(flextable)
-library(officer)
+```{r, speech-measures-table, eval=FALSE}
 
 amr_summary <- c("Consonant Production Measures",
              paste0("- CoV of voiceless stop VOTs (p=", get_grpdiff_p(vot_amr.stats, "log_coeffvar_vot_duration"), ")"),
@@ -305,11 +333,274 @@ sumtab
 
 ```
 
+```{r, descriptive-measures-table}
+
+amr_descriptives <- subset(ddk, subtask == 'amr') %>% 
+  group_by(part_grp) %>%
+  summarise("CoV of voiceless stop VOTs" = paste0(myround(mean(coeffvar_vot_duration)),' (',myround(sd(coeffvar_vot_duration)), ')'),
+            "CoV of voiced stop VOTs" = "",
+            "CoV of speech rate" = paste0(myround(mean(coeffvar_ddk_rate)),' (',myround(sd(coeffvar_ddk_rate)), ')'),
+            "CoV of vowel durations" = paste0(myround(mean(coeffvar_vowel_duration)),' (',myround(sd(coeffvar_vowel_duration)), ')'),
+            "Formant dispersion 20%" = paste0(myround(mean(formant_dispersion.20)),' (',myround(sd(formant_dispersion.20)), ')'),
+            "Change in formant dispersion 20-50%" = paste0(myround(mean(formant_delta_var)),' (',myround(sd(formant_delta_var)), ')'),
+            "Overlap between vowel categories" = "",
+            "CoV of syllable durations" = paste0(myround(mean(coeffvar_syll_duration)),' (',myround(sd(coeffvar_syll_duration)), ')'),
+            "CoV of intersyllable durations" = paste0(myround(mean(coeffvar_intersyll_duration)),' (',myround(sd(coeffvar_intersyll_duration)), ')'),
+            "Number of pauses" = "") %>%
+  tidyr::pivot_longer(!part_grp, names_to = "speech_measure", values_to = "amr") # %>% 
+  # select(speech_measure, everything())
+ 
+smr_descriptives <- subset(ddk, subtask == 'smr') %>% 
+  group_by(part_grp) %>%
+  summarise("CoV of voiceless stop VOTs" = paste0(myround(mean(coeffvar_vot_duration)),' (',myround(sd(coeffvar_vot_duration)), ')'),
+            "CoV of voiced stop VOTs" = "",
+            "CoV of speech rate" = paste0(myround(mean(coeffvar_ddk_rate)),' (',myround(sd(coeffvar_ddk_rate)), ')'),
+            "CoV of vowel durations" = paste0(myround(mean(coeffvar_vowel_duration)),' (',myround(sd(coeffvar_vowel_duration)), ')'),
+            "Formant dispersion 20%" = paste0(myround(mean(formant_dispersion.20)),' (',myround(sd(formant_dispersion.20)), ')'),
+            "Change in formant dispersion 20-50%" = paste0(myround(mean(formant_delta_var)),' (',myround(sd(formant_delta_var)), ')'),
+            "Overlap between vowel categories" = "",
+            "CoV of syllable durations" = paste0(myround(mean(coeffvar_syll_duration)),' (',myround(sd(coeffvar_syll_duration)), ')'),
+            "CoV of intersyllable durations" = paste0(myround(mean(coeffvar_intersyll_duration)),' (',myround(sd(coeffvar_intersyll_duration)), ')'),
+            "Number of pauses" = "") %>%
+  tidyr::pivot_longer(!part_grp, names_to = "speech_measure", values_to = "smr") 
+  
+rp_descriptives <- rp %>%
+  group_by(part_grp) %>%
+  summarise("CoV of voiceless stop VOTs" = paste0(myround(mean(coeffvar_vot_voiceless_duration)),' (',myround(sd(coeffvar_vot_voiceless_duration)), ')'),
+            "CoV of voiced stop VOTs" = paste0(myround(mean(coeffvar_vot_voiced_duration)),' (',myround(sd(coeffvar_vot_voiced_duration)), ')'),
+            "CoV of speech rate" = paste0(myround(mean(coeffvar_local_speech_rate)),' (',myround(sd(coeffvar_local_speech_rate)), ')'),
+            "CoV of vowel durations" = paste0(myround(mean(coeffvar_vowel_duration)),' (',myround(sd(coeffvar_vowel_duration)), ')'),
+            "Formant dispersion 20%" = paste0(myround(mean(formant_dispersion.20)),' (',myround(sd(formant_dispersion.20)), ')'),
+            "Change in formant dispersion 20-50%" = paste0(myround(mean(formant_delta_var)),' (',myround(sd(formant_delta_var)), ')'),
+            "Overlap between vowel categories" = paste0(myround(mean(formant_phonetic_competition)),' (',myround(sd(formant_phonetic_competition)), ')'),
+            "CoV of syllable durations" = "",
+            "CoV of intersyllable durations" = "",
+            "Number of pauses" = paste0(myround(mean(n_pauses_per_word)),' (',myround(sd(n_pauses_per_word)), ')')) %>% 
+  tidyr::pivot_longer(!part_grp, names_to = "speech_measure", values_to = "rp")
+
+pbj_descriptives <- pbj %>%
+  group_by(part_grp) %>%
+  summarise("CoV of voiceless stop VOTs" = paste0(myround(mean(coeffvar_vot_voiceless_duration)),' (',myround(sd(coeffvar_vot_voiceless_duration)), ')'),
+            "CoV of voiced stop VOTs" = paste0(myround(mean(coeffvar_vot_voiced_duration)),' (',myround(sd(coeffvar_vot_voiced_duration)), ')'),
+            "CoV of speech rate" = paste0(myround(mean(coeffvar_local_speech_rate)),' (',myround(sd(coeffvar_local_speech_rate)), ')'),
+            "CoV of vowel durations" = paste0(myround(mean(coeffvar_vowel_duration)),' (',myround(sd(coeffvar_vowel_duration)), ')'),
+            "Formant dispersion 20%" = paste0(myround(mean(formant_dispersion.20, na.rm = TRUE)),' (',myround(sd(formant_dispersion.20, na.rm = TRUE)), ')'),
+            "Change in formant dispersion 20-50%" = paste0(myround(mean(formant_delta_var, na.rm = TRUE)),' (',myround(sd(formant_delta_var, na.rm = TRUE)), ')'),
+            "Overlap between vowel categories" = paste0(myround(mean(formant_phonetic_competition, na.rm = TRUE)),' (',myround(sd(formant_phonetic_competition, na.rm = TRUE)), ')'),
+            "CoV of syllable durations" = "",
+            "CoV of intersyllable durations" = "",
+            "Number of pauses" = paste0(myround(mean(n_pauses_per_word)),' (',myround(sd(n_pauses_per_word)), ')')) %>%
+  tidyr::pivot_longer(!part_grp, names_to = "speech_measure", values_to = "pbj")
+            # head() %>% t() %>% as.data.frame() # %>% tibble::rownames_to_column()
+# colnames(pbj_descriptives) <- c('Spontaneous', 'Spontaneous')
+
+speech_measure_list <- c('CoV of voiceless stop VOTs', 'CoV of voiced stop VOTs', 'CoV of speech rate', 'CoV of vowel durations', 'Formant dispersion 20%', 'Change in formant dispersion 20-50%', 'Overlap between vowel categories', 'CoV of syllable durations', 'CoV of intersyllable durations', 'Number of pauses')
+p_value_table <- data.frame(speech_measure = speech_measure_list, part_grp = rep('p', length(speech_measure_list)), 
+                            amr = c(get_grpdiff_p(vot_amr.stats, "log_coeffvar_vot_duration"), '', get_grpdiff_p(ddkrate_amr.stats, 'log_coeffvar_ddkrate'), get_grpdiff_p(voweldur_amr.stats, "log_coeffvar_vowel_duration"), get_grpdiff_p(voweldisp_amr.stats, "log(formant_dispersion.20"), get_grpdiff_p(voweldispdelta_amr.stats, "formant_delta_var"), "", get_grpdiff_p(sylldur_amr.stats, "log(coeffvar_syll_duration)"), get_grpdiff_p(intersylldur_amr.stats, "log(coeffvar_intersyll_duration)"), ""), 
+                            smr = c(get_grpdiff_p(vot_smr.stats, "log_coeffvar_vot_duration"), '', get_grpdiff_p(ddkrate_smr.stats, 'log_coeffvar_ddkrate'), get_grpdiff_p(voweldur_smr.stats, "log_coeffvar_vowel_duration"), get_grpdiff_p(voweldisp_smr.stats, "log(formant_dispersion.20"), get_grpdiff_p(voweldispdelta_smr.stats, "formant_delta_var"), "", get_grpdiff_p(sylldur_smr.stats, "log(coeffvar_syll_duration)"), get_grpdiff_p(intersylldur_smr.stats, "log(coeffvar_intersyll_duration)"), ""), 
+                            rp = c(get_grpdiff_p(vot_rp.stats, "log_coeffvar_vot_voiceless_duration"), get_grpdiff_p(voiced_vot_rp.stats, "log_coeffvar_vot_voiced_duration"), get_grpdiff_p(ddkrate_rp.stats, 'log_coeffvar_local_speech_rate'), get_grpdiff_p(voweldur_rp.stats, "log_coeffvar_vowel_duration"), get_grpdiff_p(voweldisp_rp.stats, "log(formant_dispersion.20"), get_grpdiff_p(voweldispdelta_rp.stats, "formant_delta_var"), get_grpdiff_p(vowelphoncomp_rp.stats, "log_formant_phonetic_competition"), "", "", get_grpdiff_p(pauses_rp.stats, "log_n_pauses_per_word")), 
+                            pbj = c(get_grpdiff_p(vot_pbj.stats, "log_coeffvar_vot_voiceless_duration"), get_grpdiff_p(voiced_vot_pbj.stats, "log_coeffvar_vot_voiced_duration"), get_grpdiff_p(ddkrate_pbj.stats, 'log_coeffvar_local_speech_rate'), get_grpdiff_p(voweldur_pbj.stats, "log_coeffvar_vowel_duration"), get_grpdiff_p(voweldisp_pbj.stats, "log(formant_dispersion.20"), get_grpdiff_p(voweldispdelta_pbj.stats, "formant_delta_var"), get_grpdiff_p(vowelphoncomp_pbj.stats, "log_formant_phonetic_competition"), "", "", get_grpdiff_p(pauses_pbj.stats, "log_n_pauses_per_word")))
+
+descriptives_ddk <- merge(amr_descriptives, smr_descriptives, by=c('speech_measure', 'part_grp'))
+descriptives_rppbj <- merge(rp_descriptives, pbj_descriptives, by=c('speech_measure', 'part_grp'))
+descriptives <- merge(descriptives_ddk, descriptives_rppbj, by = c('speech_measure', 'part_grp'))
+descriptives$part_grp <- as.character(descriptives$part_grp)
+measure_types <- c("Consonant Production Measures", "Speech Rate Measures", "Vowel Production Measures", "Timing/Pausing Measures")
+row_dividers <- data.frame(speech_measure = measure_types, part_grp = measure_types, amr = measure_types, smr = measure_types, rp = measure_types, pbj = measure_types)
+descriptives <- rbind(descriptives, row_dividers, p_value_table)
+ord <- c('Consonant Production Measures', 'CoV of voiceless stop VOTs', 'CoV of voiced stop VOTs', 'Speech Rate Measures', 'CoV of speech rate', 'Vowel Production Measures', 'CoV of vowel durations', 'Formant dispersion 20%', 'Change in formant dispersion 20-50%', 'Overlap between vowel categories', 'Timing/Pausing Measures', 'CoV of syllable durations', 'CoV of intersyllable durations', 'Number of pauses')
+descriptives <- descriptives %>% mutate(speech_measure = factor(speech_measure, levels = ord)) %>% arrange(speech_measure)
+colnames(descriptives) <- c("Speech Measure", "Group", "Diadochokinetic-AMR", "Diadochokinetic-SMR", "Read", "Spontaneous")
+descriptives$Group[descriptives$Group == 'Clinical High-Risk'] <- 'CHR'
+descriptives$Group[descriptives$Group == 'Healthy Controls'] <- 'HC'
+desctab <- flextable(descriptives)
+desctab <- hline(desctab, i=c(1,7,8,11,12,24,25), j = NULL, border = fp_border(color = "black"), part =  "body")
+desctab <- merge_h(desctab, i=c(1,8,12,25))
+desctab <- align(desctab, i=c(1,8,12,25), align = "center", part = "body")
+desctab <- merge_v(desctab, j = c("Speech Measure"))
+desctab <- width(desctab, width = 1.2, unit = "in")
+
+for (n in 3:length(colnames(descriptives))) {
+  sig <- c()
+  trend <- c()
+  for (m in 1:nrow(descriptives)) {
+    if (descriptives[m,2] != 'p') {next}
+    if (descriptives[m,n] == "") {next}
+    if (as.numeric(descriptives[m,n]) < 0.05) {
+      sig <- c(sig,m-2,m-1,m)
+    } else if (as.numeric(descriptives[m,n]) < 0.10) {
+      trend <- c(trend,m-2,m-1,m)
+    }
+  }
+  if (length(sig) > 0) {desctab <- bold(desctab, i=sig, j=n, bold = TRUE)}
+  if (length(trend) > 0) {desctab <- italic(desctab, i=trend, j=n, italic = TRUE)}
+}
+
+
+
+desctab <- set_caption(desctab, caption = "Summary of the studied speech measures by speech task. For each speech measure/speech task combination, the table provides descriptive statistics [mean (standard deviation)] by group (CHR vs. HC), as well the p-value corresponding to the CHR vs. HC group difference test. Blank cells indicate that the speech measure in question was not calculated for the speech task in question. Measures are bolded if they show a significant CHR vs. HC group difference and italicized if just above significance. CoV: coefficient of variation; VOT: voice-onset-time.")
+
+desctab
+
+```
+
+```{r, ddk-vot-corr-stats}
+
+## VOICELESS VOTs
+# SIPS SCORES
+vot_sips_ptotal_amr.stats <- lm(SIPS_Ptotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Ptotal)))
+vot_sips_ntotal_amr.stats <- lm(SIPS_Ntotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Ntotal)))
+vot_sips_dtotal_amr.stats <- lm(SIPS_Dtotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Dtotal)))
+vot_sips_g3_amr.stats <- lm(SIPS_G3 ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_G3)))
+vot_sips_ptotal_smr.stats <- lm(SIPS_Ptotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Ptotal)))
+vot_sips_ntotal_smr.stats <- lm(SIPS_Ntotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Ntotal)))
+vot_sips_dtotal_smr.stats <- lm(SIPS_Dtotal ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Dtotal)))
+vot_sips_g3_smr.stats <- lm(SIPS_G3 ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_G3)))
+# FINGER TAPPING SCORES
+ddk$log_FingerTapping_SCTAP_NonCV <- log(ddk$FingerTapping_SCTAP_NonCV)
+ddk$log_FingerTapping_SCTAP_NonCV[is.infinite(ddk$log_FingerTapping_SCTAP_NonCV)] <- NA
+ddk$log_FingerTapping_SCTAP_DomCV <- log(ddk$FingerTapping_SCTAP_DomCV)
+ddk$log_FingerTapping_SCTAP_DomCV[is.infinite(ddk$log_FingerTapping_SCTAP_DomCV)] <- NA
+vot_ft_domcv_amr.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+vot_ft_noncv_amr.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+vot_ft_domcv_smr.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+vot_ft_noncv_smr.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+# RISK SCORES
+vot_risk_amr.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SHARPTotalRiskScore)))
+vot_risk_smr.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_vot_duration + log(avg_ddk_rate), data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SHARPTotalRiskScore)))
+```
+
+```{r, ddk-speechrate-corr-stats}
+
+## DDK RATES
+# SIPS SCORES
+ddkrate_sips_ptotal_amr.stats <- lm(SIPS_Ptotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Ptotal)))
+ddkrate_sips_ntotal_amr.stats <- lm(SIPS_Ntotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Ntotal)))
+ddkrate_sips_dtotal_amr.stats <- lm(SIPS_Dtotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_Dtotal)))
+ddkrate_sips_g3_amr.stats <- lm(SIPS_G3 ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SIPS_G3)))
+ddkrate_sips_ptotal_smr.stats <- lm(SIPS_Ptotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Ptotal)))
+ddkrate_sips_ntotal_smr.stats <- lm(SIPS_Ntotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Ntotal)))
+ddkrate_sips_dtotal_smr.stats <- lm(SIPS_Dtotal ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_Dtotal)))
+ddkrate_sips_g3_smr.stats <- lm(SIPS_G3 ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SIPS_G3)))
+# FINGER TAPPING SCORES
+ddkrate_ft_domcv_amr.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+ddkrate_ft_noncv_amr.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+ddkrate_ft_domcv_smr.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+ddkrate_ft_noncv_smr.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+# RISK SCORES
+ddkrate_risk_amr.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'amr' & !is.na(SHARPTotalRiskScore)))
+ddkrate_risk_smr.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_ddk_rate, data = subset(ddk, part_grp == 'Clinical High-Risk' & subtask == 'smr' & !is.na(SHARPTotalRiskScore)))
+
+```
+
+```{r, rp-vot-corr-stats}
+
+## VOICELESS VOTS
+## VS SIPS SCORES
+vot_sips_ptotal_rp.stats <- lm(SIPS_Ptotal ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Ptotal)))
+vot_sips_ntotal_rp.stats <- lm(SIPS_Ntotal ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Ntotal)))
+vot_sips_dtotal_rp.stats <- lm(SIPS_Dtotal ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Dtotal)))
+vot_sips_g3_rp.stats <- lm(SIPS_G3 ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_G3)))
+# FINGER TAPPING SCORES
+rp$log_FingerTapping_SCTAP_NonCV <- log(rp$FingerTapping_SCTAP_NonCV)
+rp$log_FingerTapping_SCTAP_NonCV[is.infinite(rp$log_FingerTapping_SCTAP_NonCV)] <- NA
+rp$log_FingerTapping_SCTAP_DomCV <- log(rp$FingerTapping_SCTAP_DomCV)
+rp$log_FingerTapping_SCTAP_DomCV[is.infinite(rp$log_FingerTapping_SCTAP_DomCV)] <- NA
+vot_ft_domcv_rp.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+vot_ft_noncv_rp.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+# RISK SCORES
+vot_risk_rp.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_vot_voiceless_duration + log_avg_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SHARPTotalRiskScore)))
+
+
+```
+
+```{r, rp-speechrate-corr-stats}
+
+## DDK RATES
+## VS SIPS SCORES
+ddkrate_sips_ptotal_rp.stats <- lm(SIPS_Ptotal ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Ptotal)))
+ddkrate_sips_ntotal_rp.stats <- lm(SIPS_Ntotal ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Ntotal)))
+ddkrate_sips_dtotal_rp.stats <- lm(SIPS_Dtotal ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_Dtotal)))
+ddkrate_sips_p5_rp.stats <- lm(SIPS_P5 ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_P5)))
+ddkrate_sips_g3_rp.stats <- lm(SIPS_G3 ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SIPS_G3)))
+# FINGER TAPPING SCORES
+ddkrate_ft_domcv_rp.stats <- lm(log_FingerTapping_SCTAP_DomCV ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(log_FingerTapping_SCTAP_DomCV)))
+ddkrate_ft_noncv_rp.stats <- lm(log_FingerTapping_SCTAP_NonCV ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(log_FingerTapping_SCTAP_NonCV)))
+# RISK SCORES
+ddkrate_risk_rp.stats <- lm(SHARPTotalRiskScore ~ log_coeffvar_local_speech_rate, data = subset(rp, part_grp == 'Clinical High-Risk' & !is.na(SHARPTotalRiskScore)))
+
+```
+
+```{r, correlations-table}
+
+amr_voiceless_corrs <- c(corr_output_table(vot_sips_ptotal_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_ntotal_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_dtotal_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_g3_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_ft_domcv_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_ft_noncv_amr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_risk_amr.stats, "log_coeffvar_vot_duration"))
+
+smr_voiceless_corrs <- c(corr_output_table(vot_sips_ptotal_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_ntotal_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_dtotal_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_sips_g3_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_ft_domcv_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_ft_noncv_smr.stats, "log_coeffvar_vot_duration"),
+                         corr_output_table(vot_risk_smr.stats, "log_coeffvar_vot_duration"))
+
+rp_voiceless_corrs <- c(corr_output_table(vot_sips_ptotal_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_sips_ntotal_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_sips_dtotal_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_sips_g3_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_ft_domcv_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_ft_noncv_rp.stats, "log_coeffvar_vot_voiceless_duration"),
+                         corr_output_table(vot_risk_rp.stats, "log_coeffvar_vot_voiceless_duration"))
+
+amr_ddkrate_corrs <- c(corr_output_table(ddkrate_sips_ptotal_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_ntotal_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_dtotal_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_g3_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_ft_domcv_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_ft_noncv_amr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_risk_amr.stats, "log_coeffvar_ddk_rate"))
+
+smr_ddkrate_corrs <- c(corr_output_table(ddkrate_sips_ptotal_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_ntotal_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_dtotal_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_sips_g3_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_ft_domcv_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_ft_noncv_smr.stats, "log_coeffvar_ddk_rate"),
+                         corr_output_table(ddkrate_risk_smr.stats, "log_coeffvar_ddk_rate"))
+
+rp_ddkrate_corrs <- c(corr_output_table(ddkrate_sips_ptotal_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_sips_ntotal_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_sips_dtotal_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_sips_g3_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_ft_domcv_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_ft_noncv_rp.stats, "log_coeffvar_local_speech_rate"),
+                         corr_output_table(ddkrate_risk_rp.stats, "log_coeffvar_local_speech_rate"))
+
+row_names <- c("SIPS Positive Total", "SIPS Negative Total", "SIPS Disorganized Total", "SIPS G3 (Motor)", "Finger-Tapping CoV (Dominant Hand)", "Finger-Tapping CoV (Non-Dominant Hand)", "SIPS-RC Risk Score")
+
+corr_table <- data.frame(" " = row_names, 
+                         "Voiceless VOT CoV" = amr_voiceless_corrs, "Speech Rate CoV" = amr_ddkrate_corrs,
+                         "Voiceless VOT CoV " = smr_voiceless_corrs, "Speech Rate CoV " = smr_ddkrate_corrs,
+                         " Voiceless VOT CoV" = rp_voiceless_corrs, " Speech Rate CoV" = rp_ddkrate_corrs)
+
+corr_table <- flextable(corr_table)
+corr_table <- corr_table %>% add_header_row(top = TRUE, values = c("", "Diadochokinetic-AMR", "Diadochokinetic-SMR", "Read Speech"), colwidths = c(1,2,2,2))
+corr_table <- width(corr_table, width = 1.0, unit = "in")
+corr_table <- set_caption(corr_table, caption = "Correlations between speech measures that show CHR vs. HC group differences and non-speech motor/clinical/risk validation measures. Note that the spontaneous speech task is not included as we did not observe significant group differences in that task.")
+corr_table
+```
+
 ## Diadochokinetic Speech Tasks
+
 
 Participants first completed a diadochokinetic speech task, in which they produced particular syllable types as quickly and as accurately as possible.[@ackermann_oral_1995; @fletcher_time-by-count_1972] This task consisted of two trial types that we analyze separately: Alternating Motion Rate (AMR) trials, in which participants repeated a single target syllable 15 times (e.g., pa-pa-pa..., ta-ta-ta..., ka-ka-ka...) and Sequential Motion Rate (SMR) trials, in which they repeated sequences of three syllables 10 times (e.g., pa-ta-ka..., ka-ta-pa...).
 
-Out of the seven speech measures we studied (Table \@ref(tab:speech-measures-table)), we found evidence that variability in voiceless stop consonant production predicted CHR vs. HC status (in other words, showed CHR vs. HC group differences) near-significantly in AMR trials (`r grpdiff_output(vot_amr.stats, "log_coeffvar_vot_duration")`; Figure \@ref(fig:grp-diff-plots)A) and significantly in SMR trials (`r grpdiff_output(vot_smr.stats, "log_coeffvar_vot_duration")`; Figure \@ref(fig:grp-diff-plots)B). Speech rate variability predicted CHR vs. HC status in both AMR and SMR trials (AMR: `r grpdiff_output(ddkrate_amr.stats, "log_coeffvar_ddk_rate")`; SMR: `r grpdiff_output(ddkrate_smr.stats, "log_coeffvar_ddk_rate")`; with one exception, all other speech measures showed no significant effects). However, these two measures did not correlate with SIPS scores, finger-tapping, or risk scores (results in SM-2.1).
+Out of the seven speech measures we studied (Table \@ref(tab:descriptive-measures-table)), we found evidence that CHR individuals produced more variable voiceless stop consonant voice-onset-times than HC - near significantly in AMR trials (`r grpdiff_output(vot_amr.stats, "log_coeffvar_vot_duration")`; Figure \@ref(fig:grp-diff-plots)A) and significantly in SMR trials (`r grpdiff_output(vot_smr.stats, "log_coeffvar_vot_duration")`; Figure \@ref(fig:grp-diff-plots)B). CHR individuals also produced more variable speech rates than HC in both AMR and SMR trials (AMR: `r grpdiff_output(ddkrate_amr.stats, "log_coeffvar_ddk_rate")`; SMR: `r grpdiff_output(ddkrate_smr.stats, "log_coeffvar_ddk_rate")`; with one exception, all other speech measures showed no significant effects). However, these two measures generally did not correlate with SIPS scores, finger-tapping, or risk scores (results in Table \@ref(tab:correlations-table) and Supplementary Materials 2.1). 
 
 (ref:read-corr-plots-caption) We observe a significant positive relationship between variability in speech rate and variability in finger-tapping rates in the non-dominant hand (left plot), but not the dominant hand (right plot). Each point represents one participant; the line of best-fit is shown, with shaded regions showing standard errors of the regression fit.
 
@@ -352,7 +643,8 @@ merged_diffplots
 ```
 
 ## Read Speech
-Participants then read a standardized passage aloud at a comfortable pace (full text in Supplementary Materials: SM-1.1). As in the Diadochokinetic speech task, we found that variability in voiceless stop consonant duration (`r grpdiff_output(vot_rp.stats, "log_coeffvar_vot_voiceless_duration")`) and variability in speech rate (`r grpdiff_output(ddkrate_rp.stats, "log_coeffvar_local_speech_rate")`) predicted CHR vs. HC group status (Figure \@ref(fig:grp-diff-plots)C; all other speech measures showed no significant effects). Variation in speech rate (but not consonant production) was significantly correlated with another motor measure, variability in finger-tapping rate in the non-dominant hand (`r corr_output(rp.lsr_nondomfingercv.stats, "log_coeffvar_local_speech_rate")`), but not in the dominant hand (`r corr_output(rp.lsr_domfingercv.stats, "log_coeffvar_local_speech_rate")`; Figure \@ref(fig:read-corr-plots)). However, these measures did not correlate with clinical or risk measures.
+
+Participants then read a standardized passage aloud at a comfortable pace (full text in Supplementary Materials 1.1). As in the Diadochokinetic speech task, we found that CHR individuals produced more variable voiceless stop consonant voice-onset-times (`r grpdiff_output(vot_rp.stats, "log_coeffvar_vot_voiceless_duration")`) and speech rates (`r grpdiff_output(ddkrate_rp.stats, "log_coeffvar_local_speech_rate")`) than HC (Figure \@ref(fig:grp-diff-plots)C; all other speech measures showed no significant effects). Variation in speech rate (but not consonant voice-onset-time) was significantly positively correlated with another motor measure, variability in finger-tapping rate in the non-dominant hand (`r corr_output(rp.lsr_nondomfingercv.stats, "log_coeffvar_local_speech_rate")`), but not in the dominant hand (`r corr_output(rp.lsr_domfingercv.stats, "log_coeffvar_local_speech_rate")`; Figure \@ref(fig:read-corr-plots)). However, these measures did not correlate with clinical or risk measures (results in Table \@ref(tab:correlations-table) and Supplementary Materials 2.2).
 
 ```{r, read-corr-plots, fig.cap = "(ref:read-corr-plots-caption)", fig.width = 8, fig.height = 3.2}
 
@@ -365,7 +657,7 @@ ftcorr
 ```
 
 ## Spontaneous Speech
-Finally, we elicited spontaneous speech, by asking participants to describe how to make a peanut butter and jelly sandwich for ~2 minutes. In contrast to the Diadochokinetic and Read speech samples, we found that none of the speech measures significantly predicted group status in spontaneous speech (Figure \@ref(fig:grp-diff-plots)D), including the two measures impacted in the previous tasks: variability in voiceless consonant duration (`r grpdiff_output(vot_pbj.stats, "log_coeffvar_vot_voiceless_duration")`) and variability in speech rate (`r grpdiff_output(ddkrate_pbj.stats, "log_coeffvar_local_speech_rate")`).
+Finally, we elicited spontaneous speech, by asking participants to describe how to make a peanut butter and jelly sandwich for ~2 minutes. In contrast to the Diadochokinetic and Read speech samples, we found that none of the speech measures differed by group status in spontaneous speech (Figure \@ref(fig:grp-diff-plots)D), including the two measures impacted in the previous tasks: variability in voiceless consonant voice-onset-time (`r grpdiff_output(vot_pbj.stats, "log_coeffvar_vot_voiceless_duration")`) and variability in speech rate (`r grpdiff_output(ddkrate_pbj.stats, "log_coeffvar_local_speech_rate")`). Because none of the acoustic speech tasks showed significant results (Supplementary Materials 2.3), we did not test for associations with non-speech motor/clinical/risk measures.
 
 ```{r, inperson-vs-remote-individual-plots}
 
@@ -395,39 +687,43 @@ inp_vs_rem
 
 ## In-Person vs. Remote results
 
-Because data collection occurred between 2019-2022, our study had to be adapted to the remote format partway through due to the COVID-19 pandemic (see Methods for details). In post-hoc analyses, we tested whether results differed between participants tested in-person (N=`r nrow(subset(demo, trimws(Test.Type) == 'InPerson'))`) vs. remotely (N=`r nrow(subset(demo, trimws(Test.Type) == 'Remote'))`), focusing on the measures and tasks that showed group differences in our primary analyses (Figures \@ref(fig:inperson-remote-plots) and S8-S9). Full results are presented in SM-2.4, but we generally observed that group differences in consonant variability were less stark in the remote subgroup relative to the in-person group. This seemed to be driven by greater variability in the remotely-recorded control group relative to the in-person control group. For speech rate, however, the in-person and remote subgroups showed qualitatively similar patterns, except in the Diadochokinetic-SMR subtask, where we again observed a reduction in CHR vs. HC group differences when tested remotely.
+Because data collection occurred between 2019-2022, our study had to be adapted to the remote format partway through due to the COVID-19 pandemic (see Methods for details). In post-hoc analyses, we tested whether results differed between participants tested in-person (N=`r nrow(subset(demo, trimws(Test.Type) == 'InPerson'))`) vs. remotely (N=`r nrow(subset(demo, trimws(Test.Type) == 'Remote'))`), focusing on the measures and tasks that showed group differences in our primary analyses (Figures \@ref(fig:inperson-remote-plots) and S18-S19). Full results are presented in Supplementary Materials 2.7, but we generally observed smaller group differences in consonant (voice-onset-time) variability in the remote subgroup relative to the in-person group. This seemed to be driven by greater variability in the remotely-recorded control group relative to the in-person control group. For speech rate, however, the in-person and remote subgroups showed qualitatively similar patterns, except in the Diadochokinetic-SMR subtask, where we again observed a reduction in CHR vs. HC group differences when tested remotely.
 
-## Unpacking why we did not see relationship with clinical/motor symptoms
-Contrary to our predictions, we found that the speech measures that differentiated the CHR vs. HC groups did not correlate with motor, clinical, or risk measures. We ran several additional exploratory analyses in an attempt to unpack this surprising finding.
+## Unpacking why we did not see a relationship with clinical/motor symptoms
+Contrary to our predictions, we found that the speech measures that showed CHR vs. HC group differences did not correlate with motor, clinical, or risk measures. We ran several additional exploratory analyses in an attempt to unpack this surprising finding.
 
-Past work has shown that some linguistic measures are highly correlated with sociodemographic factors.[@hitczenko_automated_2021; @hitczenko_racial_2022; @palaniyappan_more_2021] To verify this was not the case for the speech measures we studied, we ran regressions predicting demographic factors (age, sex, race, native language) from the speech measures that significantly differentiated the high-risk and healthy control groups. We found no significant relationships, suggesting that the observed group differences were not accounted for by demographic factors (see SM-2.5).
+Past work has shown that some linguistic measures are highly correlated with sociodemographic factors.[@hitczenko_automated_2021; @hitczenko_racial_2022; @palaniyappan_more_2021] To verify this was not the case for the speech measures we studied, we ran regressions predicting demographic factors (age, sex, race, native language) from the speech measures that significantly differed between the high-risk and healthy control groups. We found no significant relationships, suggesting that the observed group differences were not accounted for by demographic factors (see Supplementary Materials 2.8).
 
-We then tested whether the non-speech (motor/clinical/risk) measures correlated with one another as we would expect based on previous work.[@damme_detecting_2020; @damme_sensorimotor_2021] They did not. In our sample, individuals with greater motor abnormalities (measured by finger-tapping) did not have worse overall symptoms or higher risk of conversion scores (see SM-2.6). This suggests we did not have sufficient power to detect motor abnormalities.
+We then tested whether the non-speech (motor/clinical/risk) measures correlated with one another as we would expect based on previous work.[@damme_detecting_2020; @damme_sensorimotor_2021] They did not. In our sample, individuals with greater motor abnormalities (measured by finger-tapping) did not have worse overall symptoms or higher risk of conversion scores (see Supplementary Materials 2.9 for results). This suggests we did not have sufficient power to detect motor abnormalities. Indeed, past work has found a $r$=0.37 correlation between finger tapping speed and total negative symptoms in the CHR group[@damme_detecting_2020]. Assuming the effect size is similar for finger-tapping variability and speech variability, which we measure here, a post-hoc power analysis suggests that, in the best case scenario (i.e., without a midway shift to remote testing), we would need a sample size of N=56 (with $\alpha$ = 0.05 and $\beta$ = 0.9) to detect this effect size, whereas our analysis had sample sizes ranging from N=47-51.[@faul_statistical_2009]
 
 # Discussion
 
-We find evidence that individuals at clinical high-risk for psychosis produce more variable speech - in particular, more variable consonants and speech rates - than healthy controls in two of the three speech types we study. However, contrary to predictions, we found that increased speech variability did not correlate with non-speech motor measures, symptom severity, or conversion risk scores. Follow-up analyses suggest that these comparisons may have been underpowered and, in particular, affected by a midway shift from in-person to remote testing. This theory-driven analysis provides a thorough first look at how speech production is affected in the CHR population and speaks to the promise and challenges facing this approach to measuring motor symptoms.
+We find evidence that individuals at clinical high-risk for psychosis produce more variable speech - in particular, more variable consonant voice-onset-times and speech rates - than healthy controls in two of the three speech types we study. However, contrary to predictions, we found that increased speech variability did not correlate with non-speech motor measures, symptom severity, or conversion risk scores. Follow-up analyses suggest that these comparisons may have been underpowered and, in particular, affected by a midway shift from in-person to remote testing. This theory-driven analysis provides a thorough first look at how speech production is affected in the CHR population and speaks to the promise and challenges facing this approach to measuring motor symptoms.
 
 ## Not all aspects of speech are affected and not in all contexts
 
-Our findings converge with Parola et al.’s[@parola_voice_2020], which found that other aspects of speech rate were the strongest acoustic factor in a meta-analysis differentiating groups (n.b. they did not study voice-onset-time or speech rate variability). This stands in notable contrast to past findings in the field, which generally showed mixed results across studies (i.e., the particular speech measures that differed between groups differed depending on the study and speech samples; see discussion in Hitczenko et al.[@hitczenko_understanding_2021]). We believe this consistency across speech tasks and convergence with past studies reflects the benefits of adopting a theory-driven approach when studying highly variable speech signals.
+Our findings converge with Parola et al.’s[@parola_voice_2020] meta-analysis, which found that other aspects of speech rate were one of the three strongest acoustic factors differentiating groups (n.b. they did not study voice-onset-time or speech rate variability). This stands in notable contrast to past findings in the field, which generally showed mixed results across studies (i.e., the particular speech measures that differed between groups differed depending on the study and speech samples; see discussion in Hitczenko et al.[@hitczenko_understanding_2021]). We believe this consistency across speech tasks and convergence with past studies reflects the benefits of adopting a theory-driven approach when studying highly variable speech signals.
 
-That being said, most of the speech measures did not show group differences. In particular, we failed to find effects of variability of voiced consonant production (b,d,g), which likely reflects motor control demands. Specifically, English voiceless consonants involve more motor coordinating/timing than voiced consonants, as the vocal folds need to be suppressed for a specific amount of time.[@bortolini_word-initial_1995; @kewley-port_early_1974; @kong_fine-grained_2007; @kessinger_effects_1997; @gavino_consequences_2022; @goldrick_effects_2013] We also failed to find the expected effect for vowels. This is less expected, but one possibility is that it may reflect the more precise articulatory and timing requirements for stop consonants, which are overall much shorter than vowels.
+That being said, most of the speech measures did not show group differences. In particular, we failed to find effects of variability of voiced consonant voice-onset-times (b,d,g), which likely reflects motor control demands. Specifically, English voiceless consonants involve more motor coordinating/timing than voiced consonants, as the vocal folds need to be suppressed for a specific amount of time.[@bortolini_word-initial_1995; @kewley-port_early_1974; @kong_fine-grained_2007; @kessinger_effects_1997; @gavino_consequences_2022; @goldrick_effects_2013] We also failed to find the expected effect for vowels. This is less expected, but one possibility is that it may reflect the more precise articulatory and timing requirements for stop consonants, which are overall much shorter than vowels.
 
 In addition to variable results across measures, group differences only appeared in some of the speech tasks: Diadochokinetic-AMR, Diadochokinetic-SMR, and read speech, but not spontaneous speech. This may reflect the degree to which different tasks present challenges to speech articulation. Diadochokinetic speech involves unnatural rapid repetition of syllables, while the passage participants read includes many low frequency words (e.g., Aristotle, bow, refraction). Indeed, qualitatively, participants often remarked on the difficult aspects of these tasks, or produced disfluent speech. These sorts of targeted, more challenging speech tasks may be necessary for detecting the impact of motor disruptions on speech articulation. Another possibility is that this simply reflects statistical power; the spontaneous task was shorter, and the content was more variable, which may have washed out subtle differences between groups.
 
-Finally, there was some evidence of differences between in-person and remote participants. Healthy control individuals generally had more variable speech measures when tested remotely vs. in-person, reducing our ability to detect group differences. There has been substantial recent interest in developing remote options for all manner of clinical assessment (e.g., to reach individuals who are medically underserved[@sharp_use_2011]), but this result reveals that these approaches need to be carefully developed and validated. In the case of speech measures specifically, our results likely reflect issues in an analysis pipeline that was developed to analyze speech recorded in controlled laboratory conditions. More broadly, expanding access to such assessments requires developing analysis methods that are robust to variation in testing and recording conditions.
+In addition, there was some evidence of differences between in-person and remote participants. Healthy control individuals generally had more variable speech measures when tested remotely vs. in-person, reducing our ability to detect group differences. There has been substantial recent interest in developing remote options for all manner of clinical assessment (e.g., to reach individuals who are medically underserved[@sharp_use_2011]), but this result reveals that these approaches need to be carefully developed and validated. In the case of speech measures specifically, our results likely reflect issues in an analysis pipeline that was developed to analyze speech recorded in controlled laboratory conditions. More broadly, expanding access to such assessments requires developing analysis methods that are robust to variation in testing and recording conditions.
+
+Finally, when group differences did emerge, they were subtle. In particular, the distributions over speech measures between the CHR and HC subgroups overlapped substantially. Predicting group membership from individual speech measures yielded categorization accuracy rates between 60-65%, which is typically considered inadequate (see Supplementary Materials 2.6 for categorization analyses).[@mandrekar_receiver_2010; @hosmer_assessing_2013] It is important to stress that these measures are not diagnostic on their own (after all, speech is affected by a large number of interacting factors, only one of which is motor abilities). Nonetheless, the fact that we observe group differences and above-chance categorization rates supports the notion that theoretically-motivated speech measures, in conjunction with other sources of information, could be useful for diagnostics down the line, and future work should continue to study this possibility.
 
 ## Speech measures did not correlate with motor, clinical, or conversion risk variables
 
-While the observed group differences provide converging support that speech/motor symptoms are observed very early in the progression of psychosis, the biggest challenge facing these speech measures is that they mostly did not correlate with clinical/motor/risk variables. This could reflect insufficient power. We had non-speech motor symptoms for ~50 CHR participants, which would only let us detect effect sizes of 0.34 or higher. Exploratory analyses suggest that our particular sample and measures may have been insufficient to detect the typical clinical-high-risk motor profile, which would also weaken our ability to detect speech-motor relationships. Finally, we had to adapt our data collection procedure partway through to adhere to pandemic-related restrictions, including shortening the finger-tapping task and collecting speech samples remotely (participants were mailed audio recorders to their homes). While these changes were unavoidable, they reduced our power (e.g., by reducing the number of finger-tapping observations) and may have affected reliability, by introducing noise into our measures. We provided extensive guidelines, but ultimately had limited control over the participants’ environment (e.g., how noisy it was) and equipment (e.g., keyboard). Beyond practical task differences, the pandemic also may have had a substantial effect on individuals’ mental health, further increasing variability.[@brown_potential_2020; @druss_addressing_2020]
+While the observed group differences provide converging support that speech/motor symptoms are observed very early in the progression of psychosis, the biggest challenge facing these speech measures is that they mostly did not correlate with clinical/motor/risk variables. This could reflect insufficient power. We had non-speech motor symptoms for ~50 CHR participants, which would only let us detect effect sizes of ~0.39 or higher ($\alpha$ = 0.05; $\beta$ = 0.9). Exploratory analyses studying the relationship between motor and clinical measures in our sample (Supplementary Materials 2.9) suggest that our particular sample and measures may have been insufficient to detect the typical clinical-high-risk motor profile, which would also weaken our ability to detect speech-motor relationships. Relatedly, the clinical-high-risk participants in our sample all had a relatively low risk of conversion (i.e., risk scores of 10.1\% or lower), so there may not have been enough variability in clinical status in our sample to detect significant effects between speech measures and risk/symptom severity scores. Finally, we had to adapt our data collection procedure partway through to adhere to pandemic-related restrictions, including shortening the finger-tapping task and collecting speech samples remotely (participants were mailed audio recorders to their homes). While these changes were unavoidable, they reduced our power (e.g., by reducing the number of finger-tapping observations) and may have affected reliability, by introducing noise into our measures. We provided extensive guidelines, but ultimately had limited control over the participants’ environment (e.g., how noisy it was) and equipment (e.g., keyboard). Beyond practical task differences, the pandemic also may have had a substantial effect on individuals’ mental health, further increasing variability.[@brown_potential_2020; @druss_addressing_2020]
 
 Nonetheless, even though the speech measures did not correlate with clinical/motor variables, the fact that they differed by clinical status (CHR vs HC), which is assigned based on clinical interview, means that, on some level, these measures must be related to symptomatology. In addition, the speech differences we observe could reflect motor abnormalities that are not captured by previously-developed measures (e.g., finger-tapping). In this case, we would not expect to see a correlation between the speech measures and previously-developed measures, but the speech measures would nonetheless be clinically informative. In sum, these differences are worthy of further investigation to understand what these speech measures reflect and how they can help researchers/clinicians.
 
 ## Recommendations for future approaches
-Based on our results, future studies should prioritize difficult speech tasks that specifically target the speech feature of interest (e.g., diadochokinetic speech involving both voiceless/voiced consonants and a variety of vowels; sustained phonation tasks). An additional benefit of the more targeted measures is that they are easily transferable across other languages (many languages have the diadochokinetic speech syllables), which will be critical for establishing the validity and generalizability of these measures across populations.[@parola_speech_2022]).
+Based on our results, future studies should prioritize difficult speech tasks that specifically target the speech feature of interest (e.g., diadochokinetic speech involving both voiceless/voiced consonants and a variety of vowels; sustained phonation tasks). An additional benefit of the more targeted measures is that they are easily transferable across other languages (many languages have the diadochokinetic speech syllables), which will be critical for establishing the validity and generalizability of these measures across populations.[@parola_speech_2022]). 
 
-In addition, the clinical-high-risk group is heterogeneous and future work should identify and study well-motivated subgroups.[@dean_motor_2018; @gupta_deconstructing_2021; @mittal_covid-19_2021] This is important because speech is affected by motor abilities, but also many other factors. For example, past work has often studied speech as a window into negative symptoms. Researchers adopting that approach predict that individuals with psychosis will exhibit *less* variability, while motor deficits should result in *more* variability. Competing effects of this sort could obscure a clear relationship between speech and symptoms. To address this issue, future work could collect a larger clinical-high-risk sample and identify a subgroup that primarily shows negative symptoms vs. a subgroup that primarily shows motor symptoms, and test whether they show different speech profiles in accordance with their different symptom profiles.
+It would also be informative to systematically vary the phonetic (and other types of) complexity of the speech stimuli used (as in Kuruvilla-Dugdale et al.[@kuruvilla_detection_2020]), in order to systematically test whether more difficult speech stimuli better reveal the subtle differences in motor performance between clinical-high-risk and healthy participants, and are more sensitive to clinical severity/risk. Future studies should also study other motor measures that have been shown to capture motor/cerebellar abnormalities in early psychosis (e.g., pursuit rotor procedural learning tasks[@dean_cerebellar_2014], in which participants track a moving target with a computer mouse, or postural sway tasks[@dean_increased_2015; @bernard_cerebellar_2014], in which participants' balance is evaluated in various standing conditions). Because many existing motor tasks are difficult to adapt to remote testing, the COVID-19 pandemic limited the motor measures we could collect from our participants, but these tasks tap into distinct components of motor control (timing, motor learning, coordination, etc.), and determining which (if any) of them correlate with the speech measures we study will be important.
+
+Finally, the clinical-high-risk group is heterogeneous and future work should identify and study well-motivated subgroups.[@dean_motor_2018; @gupta_deconstructing_2021; @mittal_covid-19_2021] This is important because speech is affected by motor abilities, but also many other factors. For example, past work has often studied speech as a window into negative symptoms.[@parola_voice_2020] Even within the motor domain, it is possible that several motor networks may be impacted in this population (e.g., some individuals may show increased motor variability, while others may exhibit catatonia, or a reduction in movement variability/increase in rigidity)[@mittal_what_2017; @damme_sensorimotor_2021; @masucci_motor_2018], and that numerous distinct motor signs may be present in the same individuals.[@dean_motor_2018] While the motor deficits we focus on here should result in *more* speech variability, researchers adopting other focuses may predict that individuals will exhibit *less* speech variability. Competing effects of this sort could obscure a clear relationship between speech and symptoms. To address this issue, future work could collect a larger clinical-high-risk sample and identify subgroups (e.g., one that primarily shows negative symptoms, one that primarily shows increased motor variability, one that shows increased motor rigidity) and test whether they show different speech profiles in accordance with their different symptom profiles.
 
 Overall, however, while many questions remain, the present work provides a solid foundation for future work investigating the insights that speech production can provide for understanding the mechanisms impacted in individuals at clinical-high-risk for psychosis.
 
@@ -440,6 +736,8 @@ N=`r length(demo$participant)` participants (N=`r nrow(subset(demo, Group == 'ch
 
 ```{r demo-table}
 
+demo$Test.Type <- trimws(demo$Test.Type)
+
 rownames = c("N", "Sex (% Female)", "Age (SD)", "Race", "Ethnicity", "First Language")
 colnames = c("Clinical High-Risk (CHR)", "Healthy Controls (HC)")
 demo_table <- matrix(rep(NA, 12), nrow = 6, ncol = 2, byrow = TRUE, dimnames = list(rownames, colnames))
@@ -449,12 +747,20 @@ demo_table["N","Clinical High-Risk (CHR)"] <- paste0(nrow(subset(demo, Group == 
 demo_table["N","Healthy Controls (HC)"] <- paste0(nrow(subset(demo, Group == 'hc')), 
                                                      " (In-Person: ", nrow(subset(demo, Group == 'hc' & trimws(Test.Type) == 'InPerson')), 
                                                      "; Remote: ", nrow(subset(demo, Group == 'hc' & trimws(Test.Type) == 'Remote')), ")")
-demo_table["Sex (% Female)", "Clinical High-Risk (CHR)"] <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Sex))["1"]*100, 1), '%')
-demo_table["Sex (% Female)", "Healthy Controls (HC)"] <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Sex))["1"]*100, 1), '%')
-demo_table["Age (SD)", "Clinical High-Risk (CHR)"] <- paste0(round(mean(subset(demo, Group == 'chr')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'chr')$Demo_Age),1), ")")
-demo_table["Age (SD)", "Healthy Controls (HC)"] <- paste0(round(mean(subset(demo, Group == 'hc')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'hc')$Demo_Age),1), ")")
+demo_table["Sex (% Female)", "Clinical High-Risk (CHR)"] <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Sex))["1"]*100, 1), '%',
+                                                            " (In-Person: ", round(prop.table(table(subset(demo, Group == 'chr' & Test.Type 
+                                                                                                           == 'InPerson')$Demo_Sex))["1"]*100, 1), '%',
+                                                            "; Remote: ", round(prop.table(table(subset(demo, Group == 'chr' & Test.Type 
+                                                                                                           == 'Remote')$Demo_Sex))["1"]*100, 1), '%)')
+demo_table["Sex (% Female)", "Healthy Controls (HC)"] <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Sex))["1"]*100, 1), '%',
+                                                            " (In-Person: ", round(prop.table(table(subset(demo, Group == 'hc' & Test.Type 
+                                                                                                           == 'InPerson')$Demo_Sex))["1"]*100, 1), '%',
+                                                            "; Remote: ", round(prop.table(table(subset(demo, Group == 'hc' & Test.Type 
+                                                                                                           == 'Remote')$Demo_Sex))["1"]*100, 1), '%)')
+demo_table["Age (SD)", "Clinical High-Risk (CHR)"] <- paste0(round(mean(subset(demo, Group == 'chr')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'chr')$Demo_Age),1), ") (In-Person: ", round(mean(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Age),1), "); Remote: ", round(mean(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Age),1), "))")
+demo_table["Age (SD)", "Healthy Controls (HC)"] <- paste0(round(mean(subset(demo, Group == 'hc')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'hc')$Demo_Age),1), ") (In-Person: ", round(mean(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Age),1), "); Remote: ", round(mean(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Age),1), " (", round(sd(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Age),1), "))")
 
-chr_race <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["8"]*100, 1), "% White; ",
+chr_race_overall <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["8"]*100, 1), "% White; ",
                   round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["5"]*100, 1), "% Black; ",
                   round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["2"]*100 +
                           prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["3"]*100 +
@@ -468,12 +774,42 @@ chr_race <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race
                   round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["10 (1,8)"]*100, 1), "% First Nations & White; ",
                   round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["10 (5,8)"]*100, 1), "% Black & White; ",
                   round(prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["10 (7,8)"]*100 +
-                          prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["10 (asian, 8)"]*100, 1), "% Asian & White)")
+                          prop.table(table(subset(demo, Group == 'chr')$Demo_Race))["10 (asian, 8)"]*100, 1), "% Asian & White) ")
+
+chr_race_inperson <- paste0("(In-Person: ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["8"]*100, 1), "% White; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["5"]*100, 1), "% Black; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["2"]*100 +
+                          prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["3"]*100 +
+                          prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["4"]*100, 1), "% Asian; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Race))["6"]*100, 1), "% Central/South American; ")
+
+chr_race_remote <- paste0("Remote: ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["8"]*100, 1), "% White; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["5"]*100, 1), "% Black; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["2"]*100 +
+                          prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["3"]*100 +
+                          prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["4"]*100, 1), "% Asian; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["6"]*100, 1), "% Central/South American; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["9"]*100, 1), "% Native Hawaiian or Pacific Islander; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (1,8)"]*100,1) +
+                          round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (5,8)"]*100,1) +
+                          round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (7,8)"]*100,1) +
+                          round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (asian, 8)"]*100, 1), "% Multiracial (",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (1,8)"]*100, 1), "% First Nations & White; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (5,8)"]*100, 1), "% Black & White; ",
+                  round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (7,8)"]*100 +
+                          prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Race))["10 (asian, 8)"]*100, 1), "% Asian & White))")
+
+chr_race <- paste0(chr_race_overall, chr_race_inperson, chr_race_remote)
 
 chr_ethnicity <- paste0(round(prop.table(table(subset(demo, Group == 'chr')$Demo_Hispanic))["1"]*100, 1), "% Hispanic; ",
-                        round(prop.table(table(subset(demo, Group == 'chr')$Demo_Hispanic))["0"]*100, 1), "% Not Hispanic")
+                        round(prop.table(table(subset(demo, Group == 'chr')$Demo_Hispanic))["0"]*100, 1), "% Not Hispanic",
+                        " (In-Person: ", round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_Hispanic))["1"]*100, 1), 
+                        "% Hispanic; Remote: ", round(prop.table(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_Hispanic))["1"]*100, 1),
+                        "% Hispanic)")
 
-hc_race <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["8"]*100, 1), "% White; ",
+hc_race_overall <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["8"]*100, 1), "% White; ",
                   round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["5"]*100, 1), "% Black; ",
                   round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["2"]*100 +
                           prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["3"]*100 +
@@ -489,18 +825,83 @@ hc_race <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))
                   round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["10 (5,8)"]*100, 1), "% Black & White; ",
                   round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["10 (2, 8)"]*100 +
                           prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["10 (4, 8)"]*100, 1), "% Asian & White; ",
-                  round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["10"]*100, 1), "% not reported)")
+                  round(prop.table(table(subset(demo, Group == 'hc')$Demo_Race))["10"]*100, 1), "% not reported) ")
+
+hc_race_inperson <- paste0("(In-Person: ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["8"]*100, 1), "% White; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["5"]*100, 1), "% Black; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["2"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["3"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["4"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["7"]*100, 1), "% Asian; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["1"]*100, 1), "% First Nations; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["10"]*100,1), "% Multiracial (not reported); ")
+                  # round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Race))["10"]*100, 1), "% not reported); ")
+
+hc_race_remote <- paste0("Remote: ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["8"]*100, 1), "% White; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["2"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["4"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["7"]*100, 1), "% Asian; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["1"]*100, 1), "% First Nations; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (1,8)"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (2, 8)"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (4, 8)"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (5,8)"]*100, 1), "% Multiracial (",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (1,8)"]*100, 1), "% First Nations & White; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (5,8)"]*100, 1), "% Black & White; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (2, 8)"]*100 +
+                          prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10 (4, 8)"]*100, 1), "% Asian & White; ",
+                  round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Race))["10"]*100, 1), "% not reported))")
+
+hc_race <- paste0(hc_race_overall, hc_race_inperson, hc_race_remote)
 
 hc_ethnicity <- paste0(round(prop.table(table(subset(demo, Group == 'hc')$Demo_Hispanic))["1"]*100, 1), "% Hispanic; ",
-                        round(prop.table(table(subset(demo, Group == 'hc')$Demo_Hispanic))["0"]*100, 1), "% Not Hispanic")                 
+                        round(prop.table(table(subset(demo, Group == 'hc')$Demo_Hispanic))["0"]*100, 1), "% Not Hispanic",
+                        " (In-Person: ", round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_Hispanic))["1"]*100, 1), 
+                        "% Hispanic; Remote: ", round(prop.table(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_Hispanic))["1"]*100, 1),
+                        "% Hispanic)")                 
 
-chr_l1 <- paste0(round(100*table(subset(demo, Group == 'chr')$Demo_L1)["1"]/nrow(subset(demo, Group == 'chr')), 1), "% English; ",
+chr_l1_overall <- paste0(round(100*table(subset(demo, Group == 'chr')$Demo_L1)["1"]/nrow(subset(demo, Group == 'chr')), 1), "% English; ",
                  round(100*table(subset(demo, Group == 'chr')$Demo_L1)["2"]/nrow(subset(demo, Group == 'chr')), 1), "% Other; ",
                  100-round(100*sum(table(subset(demo, Group == 'chr')$Demo_L1))/nrow(subset(demo, Group == 'chr')), 1), "% Not reported")
 
-hc_l1 <- paste0(round(100*(table(subset(demo, Group == 'hc')$Demo_L1)["1"] + (table(subset(demo, Group == 'hc')$Demo_L1)["1,2"]))/nrow(subset(demo, Group == 'hc')), 1), "% English; ",
+chr_l1_inperson <- paste0(" (In-Person: ",
+               round(100*table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_L1)["1"] / 
+                                  nrow(subset(demo, Group == 'chr' & Test.Type == 'InPerson')), 1), "% English; ",
+                 round(100*table(subset(demo, Group == 'chr' & Test.Type == 'InPerson')$Demo_L1)["2"] / 
+                         nrow(subset(demo, Group == 'chr' & Test.Type == 'InPerson')), 1), "% Other; ")
+
+chr_l1_remote <- paste0("Remote: ",
+               round(100*table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_L1)["1"] / 
+                                  nrow(subset(demo, Group == 'chr' & Test.Type == 'Remote')), 1), "% English; ",
+                 round(100*table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_L1)["2"] / 
+                         nrow(subset(demo, Group == 'chr' & Test.Type == 'Remote')), 1), "% Other; ",
+                 100-round(100*sum(table(subset(demo, Group == 'chr' & Test.Type == 'Remote')$Demo_L1)) / 
+                             nrow(subset(demo, Group == 'chr' & Test.Type == 'Remote')), 1), "% Not reported")
+
+chr_l1 <- paste0(chr_l1_overall, chr_l1_inperson, chr_l1_remote)
+
+hc_l1_overall <- paste0(round(100*(table(subset(demo, Group == 'hc')$Demo_L1)["1"] + (table(subset(demo, Group == 'hc')$Demo_L1)["1,2"]))/nrow(subset(demo, Group == 'hc')), 1), "% English; ",
                  round(100*table(subset(demo, Group == 'hc')$Demo_L1)["2"]/nrow(subset(demo, Group == 'hc')), 1), "% Other; ",
                  100-round(100*sum(table(subset(demo, Group == 'hc')$Demo_L1))/nrow(subset(demo, Group == 'hc')), 1), "% Not reported")
+
+hc_l1_inperson <- paste0(" (In-Person: ",
+               round(100*table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_L1)["1"] / 
+                                  nrow(subset(demo, Group == 'hc' & Test.Type == 'InPerson')), 1), "% English; ",
+                 round(100*table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_L1)["2"] / 
+                         nrow(subset(demo, Group == 'hc' & Test.Type == 'InPerson')), 1), "% Other; ",
+                 100-round(100*sum(table(subset(demo, Group == 'hc' & Test.Type == 'InPerson')$Demo_L1)) / 
+                             nrow(subset(demo, Group == 'hc' & Test.Type == 'InPerson')), 1), "% Not reported; ")
+
+hc_l1_remote <- paste0("Remote: ", round(100*(table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_L1)["1"] + 
+                                                (table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_L1)["1,2"])) / 
+                                           nrow(subset(demo, Group == 'hc' & Test.Type == 'Remote')), 1), "% English; ",
+                 round(100*table(subset(demo, Group == 'hc' & Test.Type == 'Remote')$Demo_L1)["2"] / 
+                         nrow(subset(demo, Group == 'hc' & Test.Type == 'Remote')), 1), "% Other)")
+
+hc_l1 <- paste0(hc_l1_overall, hc_l1_inperson, hc_l1_remote)
                                                                                                                        
 demo_table["Race", "Clinical High-Risk (CHR)"] <-  chr_race
 demo_table["Race", "Healthy Controls (HC)"] <-  hc_race
@@ -515,7 +916,7 @@ apa_table(demo_table, caption = "(ref:demo-table-caption)")#, align = c("p{3.1cm
 ```
 
 ## Speech tasks
-Working one-on-one with an experimenter, participants provided three speech samples, recorded via a Zoom H2n portable recorder.
+Working one-on-one with an experimenter, participants provided three speech samples, recorded via a Zoom H2n portable audio recorder (44.1kHz sample rate; 16-bit recording; X/Y recording configuration; no compression/limiting or low-cut filtering was used). Participants were seated 16 inches from the recorder and worked with the experimenter to ensure proper audio/gain levels prior to recording.
 
 ### Diadochokinetic Speech Task
 Participants first completed a diadochokinetic speech task, commonly-used to examine speech motor abilities, in which they were asked to produce particular syllable types as quickly and accurately as possible.[@ackermann_oral_1995; @fletcher_time-by-count_1972] 
@@ -523,16 +924,18 @@ Participants first completed a diadochokinetic speech task, commonly-used to exa
 They first produced 12 Alternating Motion Rate (AMR) trials, repeating a target syllable 15 times (two trials each of: pa-pa-pa..., ta-ta-ta..., ka-ka-ka..., ba-ba-ba..., da-da-da..., ga-ga-ga...). They then produced 20 Sequential Motion Rate (SMR) trials, producing sequences of three syllables 10 times each per trial (10 trials each of pa-ta-ka... and ka-ta-pa...).
 
 ### Read Speech Task: Rainbow Passage
-Participants then read aloud the Rainbow Passage at a comfortable pace (passage in SM-1.1).[@fairbanks_voice_1960] The passage is commonly-used for eliciting read speech, as it is phonetically balanced (covering all English speech sounds) and emotionally neutral. The Rainbow Passage has quite a few low-frequency words (e.g., “Aristotle”, “refraction”), so it is relatively difficult to read. This speech task allows us to precisely control the speech content, while eliciting a more naturalistic speaking style than diadochokinetic speech.
+Participants then read aloud the Rainbow Passage at a comfortable pace (passage in Supplementary Materials 1.1).[@fairbanks_voice_1960] The passage is commonly-used for eliciting read speech, as it is phonetically balanced (covering all English speech sounds) and emotionally neutral. The Rainbow Passage has quite a few low-frequency words (e.g., “Aristotle”, “refraction”), so it is relatively difficult to read. This speech task allows us to precisely control the speech content, while eliciting a more naturalistic speaking style than diadochokinetic speech.
 
 ### Spontaneous Procedural Description Task: Peanut Butter and Jelly
 Finally, we elicited spontaneous speech, by asking participants to describe how to make a peanut butter and jelly sandwich for ~2 minutes. Unlike the other tasks, the speech content differed between participants (though many words overlapped: e.g., peanut, butter, knife). Such procedural description tasks are less emotionally and cognitively demanding than personal narratives while still generating a large volume of speech.[@fromm_pwas_2013]
 
 ## Speech Measures
 
-At a high-level, for each participant, for each speech sample, we estimated how variable (i) their consonant productions, (ii) their vowel productions, (iii) their speech rates, and (iv) their pausing/timing were using semi-automated methods.[@adi_automatic_2016; @barreda_fast_2021; @mcauliffe_montreal_2017; @segal_ddktor_2022] Semi-automated methods greatly increase the amount of speech we can study, as extracting speech measures by-hand is extremely time-consuming, and ensure that our measurements are consistent and replicable (analysis code is available at github.com/khitczenko/chr_speech; the National Institute of Mental Health Data Archive provides de-identified clinical, risk, and demographic information). As a result, we focused on speech measures that have been extremely well-studied and can be reliably measured automatically. The main text focuses on (i) variability in the audible duration (voice-onset-time) of stop consonants (in English: p,t,k,b,d,g), (ii) variability in the duration of vowels, and (iii) variability in speech rates (calculated at the syllable level). We discuss the remaining speech measures we studied[@sichlinger_clinical_2019; @stanislawski_negative_2021; @hillenbrand_acoustic_1995; @mccloy_talker_2015; @xie_lifg_2018; @niziolek_assessing_2018] <!-- @wright_factors_2004; @peterson_control_1952; --> in Table \@ref(tab:speech-measures-table) and SM-1.3.
+At a high-level, for each participant, for each speech sample, we estimated how variable (i) their consonant productions, (ii) their vowel productions, (iii) their speech rates, and (iv) their pausing/timing were using semi-automated methods.[@adi_automatic_2016; @barreda_fast_2021; @mcauliffe_montreal_2017; @segal_ddktor_2022] Semi-automated methods greatly increase the amount of speech we can study, as extracting speech measures by-hand is extremely time-consuming, and ensure that our measurements are consistent and replicable (analysis code is available at github.com/khitczenko/chr_speech; the National Institute of Mental Health Data Archive provides de-identified clinical, risk, and demographic information). As a result, we focused on speech measures that have been extremely well-studied and can be reliably measured automatically. The main text focuses on (i) variability in the voice-onset-time of stop consonants (in English: p,t,k,b,d,g), or the time that elapses between the release of the consonant and the onset of the following vowel, (ii) variability in the duration of vowels, and (iii) variability in speech rates (calculated at the syllable level). We discuss the remaining speech measures we studied[@sichlinger_clinical_2019; @stanislawski_negative_2021; @hillenbrand_acoustic_1995; @mccloy_talker_2015; @xie_lifg_2018; @niziolek_assessing_2018] <!-- @wright_factors_2004; @peterson_control_1952; --> in Table \@ref(tab:descriptive-measures-table) and Supplementary Materials 1.3.
 
-For the diadochokinetic speech samples, we used DDKtor[@segal_ddktor_2022] (https://github.com/MLSpeech/DDKtor) to automatically obtain the onset and offset (and thus, duration) of each stop consonant, vowel, and syllable given hand-selected windows of analysis which corresponded to the individual diadochokinetic trials. For the read and spontaneous speech, we first used the Montreal Forced Aligner to align a transcript we created for each speech sample to its audio. This provided us with the onset and offset (and thus, duration) of each vowel, consonant, and syllable produced. We then applied AutoVOT to the aligner output to obtain even more reliable onset and offsets for the stop consonants. We followed all recommendations provided by the creators of these tools (see SM-1.2 for full details).
+For the diadochokinetic speech samples, we used DDKtor[@segal_ddktor_2022] (https://github.com/MLSpeech/DDKtor) - a deep neural network model specifically trained to match human annotations of diadochokinetic speech - to automatically obtain the onset and offset (and thus, duration) of each stop consonant, vowel, and syllable given hand-selected windows of analysis which corresponded to the individual diadochokinetic trials. For the read and spontaneous speech, we first used the Montreal Forced Aligner[@mcauliffe_montreal_2017] (https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner) to automatically align a transcript we created for each speech sample to its audio. The Montreal Forced Aligner uses a pronunciation dictionary and a trained acoustic model (specifically, a GMM-HMM model triphone model trained from MFCC features) to provide the onset and offset (and thus, duration) of each vowel, consonant, and syllable produced. We then applied AutoVOT[@sonderegger_automatic_2012; @keshet_autovot_2014] - a discriminative learning algorithm trained to match human voice-onset-time measurements - to the aligner output to obtain even more reliable onsets and offsets for the stop consonant voice-onset-times. Finally, we used the FastTrack software[@barreda_fast_2021] (https://github.com/santiagobarreda/FastTrack) to automatically obtain measurements of the first and second formant for each vowel that was output either from DDKtor (for diadochokinetic speech) or from the Montreal Forced Aligner (for read and spontaneous speech). FastTrack uses linear predictive coding to systematically identify candidate formant analyses for each vowel, from which it selects one winning analysis based on the smoothness of the predicted formant contours. We followed all recommendations provided by the creators of these tools (see Supplementary Materials 1.2 for full details).
+
+These automated tools have been evaluated in the context of previous work and are highly reliable. The DDKtor software matches human annotations of diadochokinetic segment duration with correlations of *r*=0.85-0.90 and matches human annotation of diadochokinetic speech rate with correlations of *r*=0.94-0.97.[@segal_ddktor_2022] The Montreal Forced Aligner has an average phone boundary error of ~20ms, across both isolated word productions and conversational speech, comparable to human interrater reliability.[@mcauliffe_montreal_2017] For the AutoVOT software, ~90% of its predicted voice-onset-times are within 10-15ms of gold-standard human annotation, again paralleling interrater reliability rates.[@sonderegger_automatic_2012; @keshet_autovot_2014] Finally, FastTrack has an average error of ~20Hz and 98.9\% of vowels have errors of less than 5\% of the human-annotated value.[@barreda_fast_2021] Overall, these tools perform comparably to human annotators and, when applied to our speech samples specifically, result in valid measurements that match expected average values (Supplementary Materials 1.4).
 
 We measure variability using coefficients of variation, which control for potential differences in means, calculated as follows[@whiteside_patterns_2003]:
 $$\text{Coefficient of Variation} = \frac{\text{Standard Deviation}}{\text{Mean}}$$
@@ -540,10 +943,7 @@ $$\text{Coefficient of Variation} = \frac{\text{Standard Deviation}}{\text{Mean}
 All measures are log-transformed in the analyses (as they tend to be skewed right, due to lower bounds at 0).
 
 ### Variability in consonant duration
-We focused on syllable-initial stop consonants (in English: p, t, k, b, d, g) that precede vowels (e.g., the bolded sounds in “**p**asser**b**y”, “**p**ulp”, “**p**eanut”, but not the “p” in “prism”), as they have easily-measurable acoustics.[@pascal_auzou_voice_2000; @lisker_cross-language_1964] In the diadochokinetic speech tasks, we restricted our analysis even further to only include voiceless stop consonants (in English: p, t, k), as the automated tool we use for this task has only been validated for this subset. 
-<!-- We focused on stop consonants because their acoustics properties are extremely well-studied and can be measured automatically. -->
-<!-- @abramson_voice_2017;  -->
-We used the duration of the audible portion of each consonant (voice-onset-time)  to calculate: (i) the coefficient of variation over voiceless stop (p,t,k) consonants (all speech samples) and (ii) the coefficient of variation over voiced stop (b,d,g) consonants (read and spontaneous speech only).
+We focused on syllable-initial stop consonants (in English: p, t, k, b, d, g) that precede vowels (e.g., the bolded sounds in “**p**asser**b**y”, “**p**ulp”, “**p**eanut”, but not the “p” in “prism”), as they have easily-measurable acoustics.[@pascal_auzou_voice_2000; @lisker_cross-language_1964] In the diadochokinetic speech tasks, we restricted our analysis even further to only include voiceless stop consonants (in English: p, t, k), as the automated tool we use for this task has only been validated for this subset. We used the voice-onset-time duration of each consonant to calculate: (i) the coefficient of variation over voiceless stop (p,t,k) consonants (all speech samples) and (ii) the coefficient of variation over voiced stop (b,d,g) consonants (read and spontaneous speech only).
 
 ### Variability in vowel duration
 We focused on vowels that bear primary stress (e.g., only the bolded sounds: “**e**lement”, “aw**a**ken”, “an**a**lysis”) as they have easily-measurable acoustics. We used each relevant vowel’s duration to calculate the coefficient of variation across vowel tokens in each speech sample.
@@ -558,10 +958,10 @@ We used symptom severity measures, non-speech motor measures, and risk measures 
 We assessed symptom severity with SIPS scores.[@miller_symptom_1999] We focused particularly on the positive symptoms, negative symptoms, and disorganized symptoms totals to study how broadly clinically useful the speech measures are. In addition, we looked at the individual item G3 (“Motor Difficulties” - i.e., have you noticed any clumsiness, awkwardness, or lack of coordination in your movements?) to provide convergent validity of our speech measures as measuring motor difficulties.
 
 ### Convergent Validity: Finger-Tapping Scores
-Participants also completed a computerized finger-tapping task, a well-established neuropsychological measure of motor deficits.[@gur_cognitive_2010; @saykin_normative_1995; @spencer_disrupted_2003; @carroll_timing_2009; @da_silva_more_2012; @damme_detecting_2020; @damme_sensorimotor_2021; @osborne_psychomotor_2020; @rund_neurocognition_2016] Participants are instructed to press the spacebar with their index finger as quickly as possible for 10s. They complete three trials per hand. Motivated by previous work[@damme_sensorimotor_2021; @dean_longitudinal_2020] and to parallel our speech measures, we study the coefficient of variation in number of taps across trials, calculated separately for the dominant and non-dominant hands.
+Participants also completed a computerized finger-tapping task, a well-established neuropsychological measure of motor deficits.[@gur_cognitive_2010; @saykin_normative_1995; @spencer_disrupted_2003; @carroll_timing_2009; @da_silva_more_2012; @damme_detecting_2020; @damme_sensorimotor_2021; @osborne_psychomotor_2020; @rund_neurocognition_2016] This is an ideal task because it taps into broad motor network function, including motor timing, which is often affected in motor speech disorders, has been found to be sensitive to mechanisms driving psychosis, and is readily amenable to reliable and valid in-person and remote assessments.[@dreaux_time_2000; @gur_neurocognitive_2015; @becker_neurocognitive_2010; @dean_motor_2018; @dean_spontaneous_2015; @dickson_cognitive_2014; @dickson_meta-analyses_2012; @gschwandtner_fine_2006; @niendam_course_2007; @gur_cognitive_2010; @gur_computerized_2001; @wuthrich_testretest_2023; @niendam_neurocognitive_2006; @damme_motor_2019; @damme_detecting_2020] In this task, participants are instructed to press the spacebar with their index finger as quickly as possible for 10s. They complete three trials per hand. Motivated by previous work[@damme_sensorimotor_2021; @dean_longitudinal_2020] and to parallel our speech measures, we study the coefficient of variation in number of taps across trials, calculated separately for the dominant and non-dominant hands.
 
 ### Predictive Validity: SIPS Risk Calculator
-Finally, we use the SIPS-RC risk calculator[@zhang_prediction_2019] to calculate each participant’s risk of conversion to psychosis within one year (from SIPS and General Functioning scores[@niendam_neurocognitive_2006]). SIPS-RC scores can range from 0.4 to 46.9, but range from 0.8 to 10.1 in our sample.
+Finally, we use the SIPS-RC risk calculator[@zhang_prediction_2019] to calculate a probability estimate of each participant’s risk of conversion to psychosis within one year (from SIPS and General Functioning scores[@niendam_neurocognitive_2006]). SIPS-RC scores can range from 0.4\% to 46.9\%, but range from 0.8\% to 10.1\% in our sample.
 
 ## Adaptations to remote testing
 Data collection occurred between 2019-2022, and our study had to be adapted to the remote format partway through due to the COVID-19 pandemic.
@@ -572,11 +972,11 @@ We adapted speech data collection, by mailing participants the same Zoom H2n rec
 <!-- We return to this issue in the discussion. -->
 
 ## Analyses
-We run separate analyses for each speech measure in each speech sample type.[@R-base; @R-papaja; @R-ggplot2; @R-dplyr; @R-ggpubr; @R-stringr] First, to test our prediction that CHR individuals exhibit more variability in their speech productions relative to controls, we run a logistic regression predicting group status (CHR vs. HC) from each speech measure (separately). For durational speech measures, we control for averaged speech rate, by including it as an additional predictor in the regression. Next, for each speech measure that significantly differentiates clinical status, we test its clinical/convergent/predictive validity, by running separate linear regressions predicting each validation measure from each speech measure, within the CHR group only.
+We run separate analyses for each speech measure in each speech sample type.[@R-base; @R-papaja; @R-ggplot2; @R-dplyr; @R-ggpubr; @R-stringr] First, to test our prediction that CHR individuals exhibit more variability in their speech productions relative to controls, we run a linear regression predicting each speech measures (separately) from group status (CHR vs. HC). For durational speech measures, we control for averaged speech rate, by including it as an additional predictor in the regression. Next, for each speech measure that significantly differentiates clinical status, we test its clinical/convergent/predictive validity, by running separate linear regressions predicting each validation measure from each speech measure, within the CHR group only. We use an alpha level of $\alpha$ = 0.05 for all statistical tests. 
 
 **Data Availability**: All data used in this study are currently available by request from the corresponding author (K.H.). Upon acceptance, the speech measure data will be made available at github.com/khitczenko/chr_speech. The National Institute of Mental Health Data Archive provides the de-identified clinical, risk, and demographic information. All analysis code is available at github.com/khitczenko/chr_speech.
 
-**Acknowledgments**: This work was supported by the National Institutes of Health (R21 MH119677 to M.G. and V.M.). Thank you to Emily Cibelli for assistance developing the speech protocol and to Cameron Martinez, Denise Zou, Solmi Park, Maksim Giljen, Gabrielle Olson, Juston Osborne, and Kate Damme for assistance in data collection/compilation.
+**Acknowledgments**: This work was supported by the National Institutes of Health (R21 MH119677 to M.G. and V.M.). Thank you to Emily Cibelli for assistance developing the speech protocol, to Cameron Martinez, Denise Zou, Solmi Park, Maksim Giljen, Gabrielle Olson, Juston Osborne, and Kate Damme for assistance in data collection/compilation, and to the editor and reviewers for their helpful feedback.
 
 \newpage
 
