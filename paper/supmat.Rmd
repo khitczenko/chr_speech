@@ -135,7 +135,7 @@ As reported in the main text, the DDKtor software matches human annotations of d
 
 ```{r, ddktor-reliability-on-our-speech-samples, fig.cap = "\\label{fig:ddktor-reliability-plot} Density distribution of voiceless stop voice-onset-times (VOTs) in the diadochokinetic (DDK) speech samples, as output from the DDKtor software.", fig.width = 3, fig.height = 2.5}
 
-vots_ddk <- read.csv("../../ddk-automatic-acoustic-analysis/ddk-speech-measures/segments.csv")
+vots_ddk <- read.csv("../data/ddk-segments.csv")
 vots_ddk <- subset(vots_ddk, full_syll == 1 & extreme_value_withinparts == 0 & include == 1 & seg_type == 'Vot')
 vots_ddk$seg_type[vots_ddk$window_type == 'pa'] <- 'P'
 vots_ddk$seg_type[vots_ddk$window_type == 'ta'] <- 'T'
